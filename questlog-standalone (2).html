@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Questlog</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0E0F17">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: phone-shaped app shell. Top bar + scrolling page + bottom tab bar with a sliding pill. Sheets slide up over a dim backdrop. Six category colours carry the whole library. */
+:root{
+  --bg:#F3F3F8; --surface:#FFFFFF; --surface2:#EAEAF3; --line:#DBDBE7; --fg:#171826; --muted:#666981;
+  --accent:#FF6A3D; --accent-ink:#FFFFFF;
+  --c-progress:#1F7FE6; --c-completed:#17A06A; --c-backlog:#C98A00; --c-paused:#7C5CE0; --c-abandoned:#D23B3B; --c-wishlist:#D6408D;
+  --gold:#E2A400; --shadow:0 8px 24px rgba(20,20,50,.08);
+  --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E0F17; --surface:#171926; --surface2:#222536; --line:#2B2F44; --fg:#EDEEF6; --muted:#9093AB;
+    --c-progress:#4BA3FF; --c-completed:#3CCB8F; --c-backlog:#F2B93B; --c-paused:#A98EFF; --c-abandoned:#F26A66; --c-wishlist:#F57AB9;
+    --gold:#F2B93B; --shadow:0 10px 30px rgba(0,0,0,.35); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E0F17; --surface:#171926; --surface2:#222536; --line:#2B2F44; --fg:#EDEEF6; --muted:#9093AB;
+  --c-progress:#4BA3FF; --c-completed:#3CCB8F; --c-backlog:#F2B93B; --c-paused:#A98EFF; --c-abandoned:#F26A66; --c-wishlist:#F57AB9;
+  --gold:#F2B93B; --shadow:0 10px 30px rgba(0,0,0,.35); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.45 var(--body);-webkit-tap-highlight-color:transparent;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gx{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .sm{font-size:12.5px}
+#app{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;position:relative;background:var(--bg);overflow:hidden}
+@media(min-width:560px){#app{border-inline:1px solid var(--line)}}
+.view{flex:1;min-height:0;display:flex;flex-direction:column}
+.view.out{animation:vout .12s ease forwards}
+.view.inr{animation:inr .34s cubic-bezier(.2,.8,.2,1)}
+.view.inl{animation:inl .34s cubic-bezier(.2,.8,.2,1)}
+.view.inr .cat,.view.inl .cat{animation:rise .45s cubic-bezier(.2,.9,.3,1) both;animation-delay:calc(var(--i)*45ms)}
+@keyframes vout{to{opacity:0;transform:translateY(4px)}}
+@keyframes inr{from{opacity:0;transform:translateX(34px)}to{opacity:1;transform:none}}
+@keyframes inl{from{opacity:0;transform:translateX(-34px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.top{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px 10px}
+.top h1{font:800 26px/1.1 var(--display);letter-spacing:-.02em}
+.who{display:flex;align-items:center;gap:12px;min-width:0}
+.who h1{font-size:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.page{display:flex;flex-direction:column;gap:16px;padding-block:6px 28px}
+.iconbtn{width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:14px;background:var(--surface);border:1px solid var(--line);position:relative}
+.iconbtn.sm{width:38px;height:38px;border-radius:12px}
+.dot{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.av{--s:40px;width:var(--s);height:var(--s);border-radius:50%;display:grid;place-items:center;color:#fff;flex:none;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.av svg{width:55%;height:55%}
+.seg{display:flex;gap:2px;background:var(--surface2);border-radius:14px;padding:3px}
+.seg button{flex:1;min-width:0;padding:8px 6px;border-radius:11px;font-size:13px;font-weight:600;color:var(--muted);transition:background .2s,color .2s}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.basis{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.basis .seg{flex:1}
+.cats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cat{--c:var(--accent);text-align:left;border:1.5px solid color-mix(in srgb,var(--c) 38%,var(--line));background:linear-gradient(150deg,color-mix(in srgb,var(--c) 20%,var(--surface)),color-mix(in srgb,var(--c) 5%,var(--surface)));border-radius:18px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;grid-template-areas:"ic n" "l h";gap:10px 8px;align-items:end;transition:transform .15s,box-shadow .2s}
+.cat:active{transform:scale(.97)}
+.cat.on{box-shadow:0 0 0 2.5px var(--c)}
+.cat-ic{grid-area:ic;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 24%,transparent);color:var(--c);align-self:start}
+.cat-n{grid-area:n;font:800 32px/1 var(--display);color:var(--c);text-align:right;font-variant-numeric:tabular-nums}
+.cat-l{grid-area:l;font-size:13px;font-weight:600;line-height:1.2;min-width:0}
+.cat-h{grid-area:h;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.tools{display:flex;gap:8px;align-items:center}
+.search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 12px;height:44px;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;background:none;outline:0;color:var(--fg);-webkit-appearance:none;appearance:none}
+.list-head{display:flex;align-items:baseline;justify-content:space-between}
+.list-head h2,.gh{font:700 18px/1.2 var(--display);letter-spacing:-.01em}
+.count{font:600 13px var(--mono);color:var(--muted);margin-left:4px}
+.total{font-size:12.5px;color:var(--muted)}
+.link{color:var(--accent);font-weight:600;font-size:13px}
+.ggrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+@media(min-width:440px){.ggrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.gcard{text-align:left;display:flex;flex-direction:column;gap:7px;min-width:0}
+.cv{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;max-width:100%}
+.cover{position:absolute;inset:0;display:grid;place-items:center;font:800 clamp(24px,9vw,36px)/1 var(--display);letter-spacing:-.03em;color:rgba(255,255,255,.92);background:repeating-linear-gradient(135deg,rgba(255,255,255,.07) 0 2px,transparent 2px 12px),linear-gradient(160deg,hsl(var(--h) 62% 42%),hsl(calc(var(--h) + 45) 66% 22%))}
+.rcv{position:relative;width:52px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex:none}
+.rcv .cover{font-size:15px}
+.rcv.big{width:68px}.rcv.big .cover{font-size:21px}
+.cimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.shotw{flex:none;width:210px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;scroll-snap-align:start;background:var(--surface2);max-width:80%}.shotw img{width:100%;height:100%;object-fit:cover;display:block}
+.shotw.big{width:88%;max-width:none}
+.stiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stile{--c:var(--accent);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);font-size:12.5px;font-weight:600;text-align:center;transition:background .15s,border-color .15s}
+.stile svg{color:var(--c)}
+.stile.on{background:color-mix(in srgb,var(--c) 22%,var(--surface));border-color:var(--c);color:var(--fg)}
+.dt{font:800 22px/1.15 var(--display);letter-spacing:-.02em;overflow-wrap:anywhere}
+.covbtn{padding:0;display:block}
+.xmain{flex:1;min-width:0;display:flex;gap:12px;align-items:center;text-align:left;cursor:pointer}
+.ex{font-size:16px}.ex .search{height:50px}.ex .search input{font-size:17px}.ex .gh{font-size:21px}
+.ex .xrow .gt{font-size:17px}.ex .xrow .muted{font-size:14.5px}.ex .xrow .sm{font-size:13.5px}.ex .xrow .rcv{width:62px}.ex .btn.sm{height:40px;font-size:14px}
+.sb{position:absolute;left:8px;top:8px;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px 3px 6px;border-radius:999px;background:rgba(10,10,20,.74);color:#fff;backdrop-filter:blur(4px);max-width:calc(100% - 44px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--c)}
+.med{position:absolute;right:7px;top:7px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#FFE08A,#E2A400);color:#5a3d00}
+.gt{font-weight:600;line-height:1.25;overflow-wrap:anywhere}
+.gm{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.medi{display:inline-grid;vertical-align:-2px;margin-left:6px;color:var(--gold)}
+.glist{display:flex;flex-direction:column;gap:8px}
+.grow{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;text-align:left;width:100%}
+.gi{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.gr{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.pbar,.track{height:5px;border-radius:3px;background:var(--surface2);overflow:hidden}
+.pbar i,.track i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.pill{--c:var(--accent);display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--c) 16%,transparent);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c)}
+.empty{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:34px 20px;color:var(--muted);border:1.5px dashed var(--line);border-radius:20px}
+.empty b{color:var(--fg);font:700 17px var(--display)}
+.empty svg{opacity:.6;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{--c:var(--accent);padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500;transition:background .15s,border-color .15s}
+.chip.on{background:color-mix(in srgb,var(--c) 20%,var(--surface));border-color:var(--c);font-weight:600}
+.chip .x{margin-left:6px;opacity:.6}
+.chips.scrollx{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips.scrollx .chip{flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 18px;border-radius:14px;background:var(--surface2);font-weight:600;border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.wide{width:100%}
+.btn.sm{height:36px;padding:0 12px;font-size:13px;border-radius:12px}
+.btn.danger{color:var(--c-abandoned);border-color:color-mix(in srgb,var(--c-abandoned) 40%,var(--line));background:var(--surface)}
+.btn:active{transform:scale(.98)}
+.lab{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.fld{width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);padding:0 12px;outline:0}
+.fld:focus{border-color:var(--accent)}
+textarea.fld{height:auto;min-height:92px;padding:10px 12px;resize:vertical}
+select.fld{-webkit-appearance:none;appearance:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.card h2{font:700 17px var(--display)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.nav{flex:none;background:var(--surface);border-top:1px solid var(--line);padding-top:8px;padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+.nav-row{position:relative;display:grid;grid-template-columns:repeat(4,1fr)}
+.ind{position:absolute;top:0;left:0;width:25%;height:32px;display:grid;place-items:center;pointer-events:none;transition:transform .4s cubic-bezier(.3,1.3,.5,1)}
+.ind i{display:block;width:60px;height:32px;border-radius:16px;background:color-mix(in srgb,var(--accent) 24%,transparent)}
+.nb{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);font-size:11.5px;font-weight:600;padding-bottom:2px}
+.nb span.i{height:32px;display:grid;place-items:center}
+.nb.on{color:var(--fg)} .nb.on span.i{color:var(--accent)}
+#sheet{position:fixed;inset:0;z-index:50;display:none;justify-content:center;align-items:flex-end;background:rgba(6,7,14,.58);animation:fade .2s}
+#sheet.on{display:flex}
+.sheet{width:100%;max-width:520px;max-height:calc(100% - env(safe-area-inset-top,0px) - 24px);overflow-y:auto;background:var(--surface);border-radius:26px 26px 0 0;border:1px solid var(--line);border-bottom:0;padding-top:10px;padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));animation:up .34s cubic-bezier(.2,.9,.3,1);overscroll-behavior:contain}
+.grab{width:42px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.sh{display:flex;flex-direction:column;gap:16px}
+.sh-head{display:flex;align-items:flex-start;gap:12px}
+.sh-head>.grow1{flex:1;min-width:0}
+.sh-title{display:flex;align-items:center;justify-content:space-between}
+.sh-title h2{font:800 22px var(--display);letter-spacing:-.02em}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.tag{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--surface2);color:var(--muted)}
+.xrow{display:flex;gap:12px;align-items:center;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.xi{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.xlist{display:flex;flex-direction:column;gap:8px}
+.car{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;margin-inline:-16px;padding-inline:16px;scrollbar-width:none}
+.rec{flex:none;width:148px;scroll-snap-align:start;display:flex;flex-direction:column;gap:7px;min-width:0}
+.rec .why{font-size:11.5px;color:var(--muted);line-height:1.3}
+.ai{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:linear-gradient(140deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),var(--surface));border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.dots{display:inline-flex;gap:4px}.dots i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:bl 1s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+.rlist{display:flex;flex-direction:column;gap:12px}
+.rcard{text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.rtop{display:flex;align-items:center;gap:12px}
+.rinfo{flex:1;min-width:0}
+.ring{--p:70;width:54px;height:54px;border-radius:50%;flex:none;background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--surface2) 0);display:grid;place-items:center}
+.ring span{width:42px;height:42px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font:800 15px var(--display)}
+.ring.big{width:84px;height:84px}.ring.big span{width:68px;height:68px;font-size:24px}
+.bars{display:flex;flex-direction:column;gap:7px}
+.b4{display:grid;grid-template-columns:104px 1fr 30px;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.b4 b{color:var(--fg);text-align:right;font-weight:600}
+.rtext{font-size:13.5px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.tile b{font:800 30px/1.05 var(--display);letter-spacing:-.02em}
+.tile span{font-size:12.5px;color:var(--muted)}
+.stack{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);gap:2px}
+.stack i{display:block;min-width:4px}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;font-size:13px}
+.legend div{display:flex;align-items:center;gap:8px;min-width:0}
+.legend i{width:10px;height:10px;border-radius:3px;flex:none}
+.legend b{margin-left:auto;font-family:var(--mono);font-weight:600}
+.bl{display:flex;flex-direction:column;gap:9px}
+.bl .it{display:grid;grid-template-columns:96px 1fr 26px;gap:10px;align-items:center;font-size:13px}
+.bl .it span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl .it b{font-family:var(--mono);font-size:12.5px;text-align:right}
+.shots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.shot{aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--surface2)}
+.shot img{width:100%;height:100%;object-fit:cover;display:block}
+#lightbox{position:fixed;inset:0;z-index:70;background:rgba(4,5,10,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));animation:fade .2s;color:#fff}
+#lightbox[hidden]{display:none}
+#lightbox img{max-width:100%;max-height:72%;border-radius:14px;object-fit:contain}
+.mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.mcard.locked svg{filter:grayscale(1);opacity:.45}
+.mhero{display:flex;align-items:center;gap:16px;background:linear-gradient(140deg,color-mix(in srgb,var(--gold) 20%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line));border-radius:22px;padding:16px}
+.mhero h2{font:800 22px var(--display)}
+.sl{display:flex;flex-direction:column;gap:2px}
+.slh{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--accent) var(--fill,50%),var(--surface2) var(--fill,50%))}
+input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:var(--surface2)}
+input[type=range]::-moz-range-progress{height:8px;border-radius:4px;background:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--accent);margin-top:-8px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+.sw{width:50px;height:30px;border-radius:15px;background:var(--surface2);border:1px solid var(--line);position:relative;transition:background .2s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.sw.on{background:var(--accent);border-color:transparent}
+.sw.on::after{transform:translateX(20px);background:var(--accent-ink)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatch{width:36px;height:36px;border-radius:50%;border:3px solid var(--surface);box-shadow:0 0 0 1.5px var(--line);display:grid;place-items:center;color:#fff}
+.swatch.on{box-shadow:0 0 0 2.5px var(--fg)}
+.prof{display:flex;align-items:center;gap:14px}
+.prof .av{--s:62px}
+details.fq{border-top:1px solid var(--line);padding:12px 0}
+details.fq:first-of-type{border-top:0}
+details.fq summary{font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;align-items:center}
+details.fq summary::-webkit-details-marker{display:none}
+details.fq summary::after{content:"+";font:500 20px var(--mono);color:var(--muted)}
+details.fq[open] summary::after{content:"–"}
+details.fq p{margin-top:8px;color:var(--muted);font-size:14px}
+#toast{position:fixed;left:0;right:0;bottom:calc(92px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;gap:8px;z-index:90;pointer-events:none;padding:0 16px}
+.t{background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:14px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow);animation:rise .25s both}
+#onb{position:fixed;inset:0;z-index:60;background:var(--bg);overflow-y:auto}
+#onb[hidden]{display:none}
+.onb-in{max-width:520px;margin:0 auto;padding-block:max(28px,env(safe-area-inset-top,0px)) max(28px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;animation:rise .5s both}
+.onb-in h1{font:800 30px/1.1 var(--display);letter-spacing:-.025em}
+.avpick{display:flex;align-items:center;gap:14px}
+.avpick .av{--s:72px}
+.glyphs{display:flex;gap:8px;flex-wrap:wrap}
+.glyph{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface)}
+.glyph.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--surface))}
+.dc{width:30px;height:30px;border-radius:50%;border:3px solid var(--surface);box-shadow:0 0 0 1.5px var(--line)}
+.dc.on{box-shadow:0 0 0 2.5px var(--fg)}
+.chk{display:flex;align-items:center;gap:12px}
+#splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(120% 90% at 50% 28%,#2B2456 0%,#14142A 48%,#0B0C14 100%);color:#fff;transition:opacity .55s,transform .55s}
+#splash.hide{opacity:0;transform:scale(1.05);pointer-events:none}
+.sp-in{display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px}
+.logo{overflow:visible;filter:drop-shadow(0 12px 40px rgba(255,90,100,.45));animation:float 3s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-6px)}}
+.lg-badge{stroke-dasharray:360;stroke-dashoffset:360;animation:draw .9s .15s ease forwards}
+.lg-fill{opacity:0;animation:fadein .5s .75s forwards}
+.lg-bar{transform-box:fill-box;transform-origin:left center;transform:scaleX(0);animation:bar .5s cubic-bezier(.2,.9,.3,1.2) forwards}
+.lg-bar.b1{animation-delay:.85s}.lg-bar.b2{animation-delay:1s}.lg-bar.b3{animation-delay:1.15s}
+.lg-check{transform-box:fill-box;transform-origin:center;transform:scale(0);animation:pop .5s 1.45s cubic-bezier(.2,1.7,.4,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fadein{to{opacity:1}}
+@keyframes bar{to{transform:scaleX(1)}}
+@keyframes pop{to{transform:scale(1)}}
+.wm{display:flex;font:800 38px/1 var(--display);letter-spacing:-.03em}
+.wm span{display:inline-block;opacity:0;transform:translateY(16px);animation:rise2 .5s forwards;animation-delay:calc(1.3s + var(--i)*.06s)}
+@keyframes rise2{to{opacity:1;transform:none}}
+.tg{font-size:14px;color:rgba(255,255,255,.66);opacity:0;animation:fadein .6s 1.9s forwards}
+.loadbar{width:120px;height:3px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden}
+.loadbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#FF8A5C,#FF4F7B);transform:translateX(-100%);animation:ld 2.9s .1s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes ld{to{transform:none}}
+#tapSound{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;color:rgba(255,255,255,.7);font-size:13px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.2)}
+#tapSound[hidden]{display:none}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}
+  .lg-badge{stroke-dashoffset:0}.lg-fill,.tg,.wm span{opacity:1;transform:none}.lg-bar,.lg-check{transform:none}
+}
+</style></head><body>
+
+<div id="app">
+  <div id="view" class="view"></div>
+  <nav class="nav" id="nav" aria-label="Main"><div class="gx"><div class="nav-row" id="navRow"></div></div></nav>
+</div>
+<div id="sheet"></div>
+<div id="lightbox" hidden></div>
+<div id="onb" hidden></div>
+<div id="toast" aria-live="polite"></div>
+<div id="splash" aria-hidden="true">
+  <div class="sp-in">
+    <svg class="logo" viewBox="0 0 120 120" width="132" height="132">
+      <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A5C"/><stop offset="1" stop-color="#FF4F7B"/></linearGradient></defs>
+      <rect class="lg-fill" x="10" y="10" width="100" height="100" rx="30" fill="url(#lg1)"/>
+      <rect class="lg-badge" x="10" y="10" width="100" height="100" rx="30" fill="none" stroke="#fff" stroke-width="3"/>
+      <rect class="lg-bar b1" x="28" y="36" width="40" height="10" rx="5" fill="#fff"/>
+      <rect class="lg-bar b2" x="28" y="55" width="58" height="10" rx="5" fill="#fff" fill-opacity=".85"/>
+      <rect class="lg-bar b3" x="28" y="74" width="28" height="10" rx="5" fill="#fff" fill-opacity=".7"/>
+      <g class="lg-check"><circle cx="86" cy="41" r="13" fill="#17A06A"/><path d="M79.5 41.5l4.5 4.5 8-9" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </svg>
+    <div class="wm" id="wm"></div>
+    <div class="tg" id="tg"></div>
+    <div class="loadbar"><i></i></div>
+  </div>
+  <button id="tapSound" hidden></button>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE9A3"/><stop offset=".55" stop-color="#F2B93B"/><stop offset="1" stop-color="#C98A00"/></linearGradient></defs></svg>
+<input type="file" id="fileCover" accept="image/*" hidden>
+<input type="file" id="fileShot" accept="image/*" multiple hidden>
+<input type="file" id="filePhoto" accept="image/*" hidden>
+<input type="file" id="fileRestore" accept=".json,application/json,text/plain" hidden>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var uid=function(){return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4)};
+var norm=function(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()};
+var STATUSES=['progress','completed','backlog','paused','abandoned','wishlist'];
+var DEFPLAT=['PC','PS5','PS4','Xbox','Switch','Mobile','Steam Deck','Other'];
+var DEFGEN=['Action','Adventure','RPG','Shooter','Platformer','Puzzle','Strategy','Simulation','Racing','Sports','Fighting','Horror','Roguelike','Metroidvania','Soulslike','Open World','Indie','Story-Rich'];
+var CATS4=['visual','gameplay','audio','design'];
+var BASIS=['main','extra','comp'];
+var TABS=['home','explore','review','settings'];
+
+/* ---------- icons ---------- */
+var ICONS={
+ home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+ explore:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+ review:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+ settings:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+ grid:'<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+ list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+ filter:'<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',
+ close:'<path d="M6 6l12 12M18 6L6 18"/>',
+ check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+ trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+ copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+ image:'<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4"/>',
+ medal:'<circle cx="12" cy="15" r="5.5"/><path d="M8.7 10.3L6.5 3h4l1.5 3.5L13.5 3h4l-2.2 7.3"/>',
+ spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
+ play:'<path d="M7 4.5v15l12-7.5z"/>',
+ pause:'<path d="M8 5v14M16 5v14"/>',
+ stack:'<path d="M12 3l9 5-9 5-9-5zM3 12.5l9 5 9-5M3 16.5l9 5 9-5"/>',
+ xcircle:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+ heart:'<path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 22l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/>',
+ controller:'<path d="M6 11h4M8 9v4M15 12h.01M18 10h.01M7 6h10a4 4 0 0 1 4 4v4a3 3 0 0 1-5 2l-1-1.5H9L8 16a3 3 0 0 1-5-2v-4a4 4 0 0 1 4-4z"/>',
+ sword:'<path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>',
+ ghost:'<path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/>',
+ star:'<path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
+ bolt:'<path d="M13 2L3 14h9l-1 8 10-12h-9z"/>',
+ shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+ crown:'<path d="M3 18h18M4 18L3 7l5 4 4-7 4 7 5-4-1 11"/>',
+ sound:'<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7"/>'
+};
+function ic(n,sz){sz=sz||20;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[n]||'')+'</svg>'}
+var CATIC={progress:'play',completed:'check',backlog:'stack',paused:'pause',abandoned:'xcircle',wishlist:'heart'};
+var GLYPHS=['controller','sword','ghost','star','bolt','shield','heart','crown'];
+var AVC=['#FF6A3D','#2F7BFF','#2FA66A','#8B6CF0','#E8457C','#D9A100'];
+var ACC={ember:['#FF6A3D','#FFFFFF'],ocean:['#2F7BFF','#FFFFFF'],orchid:['#A855F7','#FFFFFF'],moss:['#2FA66A','#FFFFFF'],gold:['#E8B100','#1B1400'],rose:['#E8457C','#FFFFFF']};
+
+/* ---------- language ---------- */
+var L={en:{
+tagline:'Your game backlog, under control',tapSound:'Tap for sound',
+nav_home:'Home',nav_explore:'Explore',nav_review:'Review',nav_settings:'Settings',
+st_progress:'In Progress',st_completed:'Completed',st_backlog:'Backlog',st_paused:'Paused',st_abandoned:'Abandoned',st_wishlist:'Wishlist',
+welcomeBack:'Welcome back',addGame:'Add game',basis_main:'Main Story',basis_extra:'Main + Extras',basis_comp:'Completionist',
+searchLibrary:'Search your games',all:'All games',gamesWord:'games',
+sort:'Sort',sort_added:'Recently added',sort_title:'Title A–Z',sort_hours:'Longest first',sort_rating:'Highest rated',sort_year:'Newest release',
+filters:'Sort & filter',status:'Status',platform:'Platform',genre:'Genre',reset:'Reset',done:'Done',
+noGames:'No games match',emptyLib:'Your list is empty',emptyLibHint:'Add a game with the + button or browse Explore.',
+title:'Title',year:'Release year',main:'Main',extra:'Main + Extras',comp:'Completionist',hltb:'HowLongToBeat hours',lookup:'Look up hours',played:'Hours I played',
+writeReview:'Write review',editReview:'Edit review',delete:'Delete',confirmDelete:'Tap again to confirm',save:'Save',add:'Add',addToLib:'Add to library',inLib:'In library',
+explore:'Explore',searchCatalog:'Search IGDB',forYou:'Picked for you',because:'Because you played',popular:'Popular pick',browse:'Browse',askAI:'Ask AI for picks',aiThinking:'AI is thinking',aiNeedsKey:'Add a Gemini API key in Settings to get AI picks.',aiFail:'Could not reach the AI service. Check your API key and connection.',offlineCat:'Offline catalog',igdbOn:'IGDB live search on',igdbOff:'IGDB live search off',approx:'Hours are approximate sample values until a HowLongToBeat source is connected.',noResults:'No results',aiTitle:'AI recommendations',editInfo:'Edit info',noSummary:'No description yet.',developer:'Developer',coverPick:'Choose cover from device',coverRemove:'Remove cover',loadMore:'Load more',results:'Results',connectTitle:'Connect IGDB',connectHint:'Add your Twitch Client ID and Client Secret in Settings to search games.',playtime:'Playtime',testBtn:'Test IGDB connection',topRated:'Top rated on IGDB',directId:'Twitch Client ID',directSecret:'Twitch Client Secret',igdbBlocked:'Could not reach IGDB through the proxy. Check your Client ID, Client Secret and Proxy URL.',proxyLbl:'Proxy URL',aiCard:'AI picks (optional)',syncIGDB:'Sync from IGDB',syncAll:'Fetch covers & info for all games',syncing:'Syncing {m} games…',synced:'Updated {n} games',noProxy:'Add your IGDB proxy URL in Settings first.',syncFail:'No match found',screenshots:'Screenshots',about_game:'About this game',
+review:'Review',reviews:'Reviews',stats:'Stats',gallery:'Gallery',medals:'Medals',
+visual:'Visual',gameplay:'Gameplay',audio:'Audio',design:'Design / Technical',finalScore:'Final score',yourThoughts:'Your thoughts',full100:'100% completed',full100Hint:'Awards a medal and marks the game Completed.',pickGame:'Choose a game',
+noReviews:'No reviews yet',noReviewsHint:'Rate a game on four categories. The average becomes its final score.',noLibForReview:'Add a game to your library first.',
+totalGames:'Games',completionRate:'Completion rate',avgScore:'Average score',toClear:'Left to clear',weeksAt:'about {n} weeks at 10 h/week',statusSplit:'Status split',categoryScores:'Average by category',topGenres:'Top genres',topPlatforms:'Top platforms',noScores:'Write a review to see category averages.',
+addShot:'Add screenshot',noShots:'No screenshots yet',noShotsHint:'Add screenshots from games in your library.',
+medalsHint:'Earned by finishing a game at 100% completion.',noMedals:'No medals yet',earned:'{n} earned',markFull:'Mark 100%',almost:'Completed, not yet 100%',
+profile:'Profile',editProfile:'Edit profile',name:'Name',bio:'Short bio',avatar:'Avatar',uploadPhoto:'Upload photo',removePhoto:'Remove photo',nameReq:'Enter a name to continue',
+customGenres:'Custom genres',customPlatforms:'Custom platforms',addGenre:'New genre',addPlatform:'New platform',
+backup:'Backup & restore',backupHint:'Your list lives on this device. Copy a backup and keep it somewhere safe.',copyBackup:'Copy backup',copied:'Copied to clipboard',copyFail:'Copy blocked. Select the text and copy it by hand.',showText:'Show backup text',hideText:'Hide text',restore:'Restore',restoreFile:'Choose backup file',pasteHere:'Paste backup text here',restored:'Backup restored',badBackup:'That does not look like a Questlog backup',incShots:'Include screenshots',
+appearance:'Theme & language',mode:'Mode',mode_system:'System',mode_light:'Light',mode_dark:'Dark',accent:'Accent colour',language:'Language',playBasis:'Playtime basis',sfx:'Sound effects',
+sources:'IGDB connection',sourcesHint:'All game data comes from IGDB. Your keys stay on this device, but they are sent through the Proxy URL below. Only use a proxy you trust. Clear the field to call IGDB directly.',igdbProxy:'IGDB proxy URL',hltbProxy:'HowLongToBeat proxy URL',geminiKey:'Gemini API key',geminiModel:'Gemini model',
+help:'Help',faq:'FAQ',about:'About us',contact:'Contact',
+aboutText:'Questlog is a personal tracker for the games you want to play, are playing, and have finished. It runs on your device, keeps your list private, and uses IGDB for game data and HowLongToBeat for playtime. Version 1.0.',
+contactHint:'Write a message, copy it, and send it to the developer.',yourMessage:'Your message',copyMessage:'Copy message',
+dataZone:'Your data',removeSamples:'Remove sample games',resetAll:'Erase everything',removed:'Removed',
+onbTitle:'Create your profile',onbSub:'It takes ten seconds. Everything stays on this device.',start:'Start my quest',sampleGames:'Start with a few sample games',favPlatform:'Main platform',
+storageFull:'Storage is full. Remove a few screenshots.',addedTo:'Added to {s}',saved:'Saved',close:'Close',none:'None',
+fq1:'Where is my data stored?',fa1:'On this device, in the browser storage of the app. Copy a backup from Settings now and then so you can restore it on a new phone.',
+fq2:'Where do the hours come from?',fa2:'Each game stores HowLongToBeat hours for Main Story, Main + Extras and Completionist. Main Story is the default. You can edit any value, and custom games take hours you type in.',
+fq3:'How is the final score calculated?',fa3:'You rate Visual, Gameplay, Audio and Design / Technical from 0 to 10. The final score is the average of the four.',
+fq4:'How do I earn a medal?',fa4:'Turn on 100% completed when you review a game, or tap Mark 100% in the Medals tab for a completed game.',
+fq5:'How do I move to a new phone?',fa5:'Copy a backup in Settings, open Questlog on the new phone, and paste it into Restore.',
+fq6:'How do the AI picks work?',fa6:'Gemini receives the titles, status and scores in your library and replies with games you do not own yet. It needs your own API key.'
+},id:{
+tagline:'Daftar game kamu, tertata rapi',tapSound:'Ketuk untuk suara',
+nav_home:'Beranda',nav_explore:'Jelajah',nav_review:'Ulasan',nav_settings:'Setelan',
+st_progress:'Sedang Dimainkan',st_completed:'Tamat',st_backlog:'Antrean',st_paused:'Ditunda',st_abandoned:'Ditinggalkan',st_wishlist:'Wishlist',
+welcomeBack:'Selamat datang kembali',addGame:'Tambah game',basis_main:'Cerita Utama',basis_extra:'Utama + Ekstra',basis_comp:'Completionist',
+searchLibrary:'Cari game kamu',all:'Semua game',gamesWord:'game',
+sort:'Urutkan',sort_added:'Terbaru ditambahkan',sort_title:'Judul A–Z',sort_hours:'Terlama dulu',sort_rating:'Nilai tertinggi',sort_year:'Rilis terbaru',
+filters:'Urutkan & filter',status:'Status',platform:'Platform',genre:'Genre',reset:'Reset',done:'Selesai',
+noGames:'Tidak ada game yang cocok',emptyLib:'Daftarmu masih kosong',emptyLibHint:'Tambah game dengan tombol + atau buka Jelajah.',
+title:'Judul',year:'Tahun rilis',main:'Utama',extra:'Utama + Ekstra',comp:'Completionist',hltb:'Jam HowLongToBeat',lookup:'Cari jam main',played:'Jam yang sudah kumainkan',
+writeReview:'Tulis ulasan',editReview:'Ubah ulasan',delete:'Hapus',confirmDelete:'Ketuk lagi untuk konfirmasi',save:'Simpan',add:'Tambah',addToLib:'Tambah ke daftar',inLib:'Sudah di daftar',
+explore:'Jelajah',searchCatalog:'Cari di IGDB',forYou:'Pilihan untukmu',because:'Karena kamu main',popular:'Pilihan populer',browse:'Telusuri',askAI:'Minta rekomendasi AI',aiThinking:'AI sedang berpikir',aiNeedsKey:'Tambahkan kunci API Gemini di Setelan untuk rekomendasi AI.',aiFail:'Layanan AI tidak bisa dihubungi. Periksa kunci API dan koneksi.',offlineCat:'Katalog offline',igdbOn:'Pencarian langsung IGDB aktif',igdbOff:'Pencarian langsung IGDB mati',approx:'Jam main adalah perkiraan sampel sampai sumber HowLongToBeat terhubung.',noResults:'Tidak ada hasil',aiTitle:'Rekomendasi AI',editInfo:'Ubah info',noSummary:'Belum ada deskripsi.',developer:'Pengembang',coverPick:'Pilih sampul dari perangkat',coverRemove:'Hapus sampul',loadMore:'Muat lebih banyak',results:'Hasil',connectTitle:'Hubungkan IGDB',connectHint:'Isi Twitch Client ID dan Client Secret di Setelan untuk mencari game.',playtime:'Waktu main',testBtn:'Tes koneksi IGDB',topRated:'Nilai tertinggi di IGDB',directId:'Twitch Client ID',directSecret:'Twitch Client Secret',igdbBlocked:'Tidak bisa menghubungi IGDB lewat proxy. Periksa Client ID, Client Secret, dan URL proxy.',proxyLbl:'URL proxy',aiCard:'Rekomendasi AI (opsional)',syncIGDB:'Sinkron dari IGDB',syncAll:'Ambil sampul & info semua game',syncing:'Menyinkronkan {m} game…',synced:'{n} game diperbarui',noProxy:'Isi URL proxy IGDB di Setelan dulu.',syncFail:'Tidak ada yang cocok',screenshots:'Tangkapan layar',about_game:'Tentang game ini',
+review:'Ulasan',reviews:'Ulasan',stats:'Statistik',gallery:'Galeri',medals:'Medali',
+visual:'Visual',gameplay:'Gameplay',audio:'Audio',design:'Desain / Teknis',finalScore:'Skor akhir',yourThoughts:'Pendapatmu',full100:'Tamat 100%',full100Hint:'Memberi medali dan menandai game sebagai Tamat.',pickGame:'Pilih game',
+noReviews:'Belum ada ulasan',noReviewsHint:'Nilai game di empat kategori. Rata-ratanya jadi skor akhir.',noLibForReview:'Tambahkan game ke daftar dulu.',
+totalGames:'Game',completionRate:'Tingkat tamat',avgScore:'Skor rata-rata',toClear:'Sisa untuk ditamatkan',weeksAt:'sekitar {n} minggu dengan 10 jam/minggu',statusSplit:'Pembagian status',categoryScores:'Rata-rata per kategori',topGenres:'Genre teratas',topPlatforms:'Platform teratas',noScores:'Tulis ulasan untuk melihat rata-rata kategori.',
+addShot:'Tambah tangkapan layar',noShots:'Belum ada tangkapan layar',noShotsHint:'Tambahkan tangkapan layar dari game di daftarmu.',
+medalsHint:'Didapat dengan menamatkan game sampai 100%.',noMedals:'Belum ada medali',earned:'{n} didapat',markFull:'Tandai 100%',almost:'Tamat, belum 100%',
+profile:'Profil',editProfile:'Ubah profil',name:'Nama',bio:'Bio singkat',avatar:'Avatar',uploadPhoto:'Unggah foto',removePhoto:'Hapus foto',nameReq:'Isi nama untuk melanjutkan',
+customGenres:'Genre kustom',customPlatforms:'Platform kustom',addGenre:'Genre baru',addPlatform:'Platform baru',
+backup:'Cadangan & pulihkan',backupHint:'Daftarmu tersimpan di perangkat ini. Salin cadangan dan simpan di tempat aman.',copyBackup:'Salin cadangan',copied:'Disalin ke papan klip',copyFail:'Penyalinan diblokir. Pilih teks dan salin manual.',showText:'Tampilkan teks cadangan',hideText:'Sembunyikan teks',restore:'Pulihkan',restoreFile:'Pilih berkas cadangan',pasteHere:'Tempel teks cadangan di sini',restored:'Cadangan dipulihkan',badBackup:'Ini bukan cadangan Questlog',incShots:'Sertakan tangkapan layar',
+appearance:'Tema & bahasa',mode:'Mode',mode_system:'Sistem',mode_light:'Terang',mode_dark:'Gelap',accent:'Warna aksen',language:'Bahasa',playBasis:'Dasar waktu main',sfx:'Efek suara',
+sources:'Koneksi IGDB',sourcesHint:'Semua data game berasal dari IGDB. Kuncimu tetap di perangkat ini, tetapi dikirim lewat URL proxy di bawah. Pakai proxy yang kamu percaya. Kosongkan kolom untuk memanggil IGDB langsung.',igdbProxy:'URL proxy IGDB',hltbProxy:'URL proxy HowLongToBeat',geminiKey:'Kunci API Gemini',geminiModel:'Model Gemini',
+help:'Bantuan',faq:'FAQ',about:'Tentang kami',contact:'Kontak',
+aboutText:'Questlog adalah pelacak pribadi untuk game yang ingin, sedang, dan sudah kamu mainkan. Berjalan di perangkatmu, daftarmu tetap privat, dengan data game dari IGDB dan waktu main dari HowLongToBeat. Versi 1.0.',
+contactHint:'Tulis pesan, salin, lalu kirim ke pengembang.',yourMessage:'Pesanmu',copyMessage:'Salin pesan',
+dataZone:'Datamu',removeSamples:'Hapus game contoh',resetAll:'Hapus semuanya',removed:'Dihapus',
+onbTitle:'Buat profilmu',onbSub:'Cuma sepuluh detik. Semua tersimpan di perangkat ini.',start:'Mulai petualangan',sampleGames:'Mulai dengan beberapa game contoh',favPlatform:'Platform utama',
+storageFull:'Penyimpanan penuh. Hapus beberapa tangkapan layar.',addedTo:'Ditambahkan ke {s}',saved:'Tersimpan',close:'Tutup',none:'Tidak ada',
+fq1:'Di mana dataku disimpan?',fa1:'Di perangkat ini, pada penyimpanan browser aplikasi. Salin cadangan dari Setelan secara berkala agar bisa dipulihkan di ponsel baru.',
+fq2:'Dari mana jam mainnya?',fa2:'Tiap game menyimpan jam HowLongToBeat untuk Cerita Utama, Utama + Ekstra, dan Completionist. Cerita Utama jadi default. Semua nilai bisa diubah, dan game kustom memakai jam yang kamu ketik.',
+fq3:'Bagaimana skor akhir dihitung?',fa3:'Kamu menilai Visual, Gameplay, Audio, dan Desain / Teknis dari 0 sampai 10. Skor akhir adalah rata-rata keempatnya.',
+fq4:'Bagaimana cara mendapat medali?',fa4:'Aktifkan Tamat 100% saat mengulas game, atau ketuk Tandai 100% di tab Medali untuk game yang sudah tamat.',
+fq5:'Bagaimana pindah ke ponsel baru?',fa5:'Salin cadangan di Setelan, buka Questlog di ponsel baru, lalu tempel di Pulihkan.',
+fq6:'Bagaimana rekomendasi AI bekerja?',fa6:'Gemini menerima judul, status, dan skor di daftarmu lalu membalas dengan game yang belum kamu punya. Butuh kunci API milikmu.'
+}};
+var S;
+function t(k,p){var s=(L[S.settings.lang]||L.en)[k];if(s==null)s=L.en[k];if(s==null)return k;if(p)for(var q in p)s=s.replace('{'+q+'}',p[q]);return s}
+
+/* ---------- state ---------- */
+var KEY='questlog.v1';
+function defaults(){return {profile:null,settings:{lang:'en',mode:'dark',accent:'ember',basis:'main',sound:true,view:'grid',sort:'added',customGenres:[],customPlatforms:[],igdbClientId:'',igdbClientSecret:'',proxyUrl:'https://corsproxy.io/?url=',geminiKey:'',geminiModel:'gemini-3.8-flash'},games:[]}}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r),d=defaults();d.profile=o.profile||null;d.settings=Object.assign(d.settings,o.settings||{});if(d.settings.geminiModel==='gemini-2.5-flash')d.settings.geminiModel='gemini-3.8-flash';['igdbProxy','corsToken','backloggd','hltbProxy'].forEach(function(k){delete d.settings[k]});d.games=Array.isArray(o.games)?o.games.filter(function(g){return !g.sample}):[];return d}}catch(e){}return defaults()}
+S=load();
+var saveT;function save(){clearTimeout(saveT);saveT=setTimeout(saveNow,150)}
+function saveNow(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast(t('storageFull'))}}
+
+
+/* ---------- helpers ---------- */
+var ui={live:newList(),top:newList(),igdbErr:'',tab:'home',q:'',status:null,plats:[],genres:[],sort:S.settings.sort,view:S.settings.view,rvTab:'reviews',exQ:'',exGenre:'All',ai:{state:'idle',items:[]},live:{q:'',items:[],state:'idle',err:''},xmap:{},sh:null,rv:null,xa:null,pf:null,pick:'review',shotGame:null,bkOpen:false};
+function hoursFor(g,b){b=b||S.settings.basis;return (g.hltb&&g.hltb[b])||0}
+function fmtH(n,d){if(!n&&d)return '—';return (n>=100||Number.isInteger(n)?Math.round(n):Math.round(n*10)/10)+'h'}
+function avg(r){return Math.round((r.visual+r.gameplay+r.audio+r.design)/4*10)/10}
+function hue(s){var h=0;s=String(s);for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%360;return h}
+function initials(s){var w=String(s).replace(/[^A-Za-z0-9\s]/g,' ').split(/\s+/).filter(function(x){return x&&!/^(the|of|a|an|and|part|i)$/i.test(x)});if(!w.length)return '?';return (w.length===1?w[0].slice(0,2):w.slice(0,3).map(function(x){return x[0]}).join('')).toUpperCase()}
+function coverHTML(g){return '<div class="cover" style="--h:'+hue(g.title)+'">'+esc(initials(g.title))+(g.cover?'<img class="cimg" src="'+esc(g.cover)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'</div>'}
+function findLib(title){var n=norm(title);return S.games.find(function(g){return norm(g.title)===n})}
+function fmtDate(ts){try{return new Date(ts).toLocaleDateString(S.settings.lang==='id'?'id-ID':'en-GB',{day:'numeric',month:'short',year:'numeric'})}catch(e){return ''}}
+function allPlats(){return DEFPLAT.concat(S.settings.customPlatforms.filter(function(x){return DEFPLAT.indexOf(x)<0}))}
+function allGens(){return DEFGEN.concat(S.settings.customGenres.filter(function(x){return DEFGEN.indexOf(x)<0}))}
+function newGame(src,status,platform){return {id:uid(),title:src.title,year:src.year||'',dev:src.dev||'',genres:(src.genres||[]).slice(),platform:platform||'',status:status,hltb:Object.assign({main:0,extra:0,comp:0},src.hltb||{}),played:0,added:Date.now(),review:null,full100:false,gallery:[],cid:src.cid||null,cover:src.cover||'',summary:src.summary||'',shots:(src.shots||[]).slice(),igdbId:src.igdbId||null}}
+function avatarHTML(p,s){p=p||{};var st='--s:'+(s||40)+'px;background:'+(p.color||AVC[0]);return '<div class="av" style="'+st+'">'+(p.photo?'<img src="'+p.photo+'" alt="">':ic(p.glyph||'controller'))+'</div>'}
+function empty(a,b,icn){return '<div class="empty">'+ic(icn||'stack',34)+'<b>'+esc(a)+'</b><span>'+esc(b||'')+'</span></div>'}
+function toast(m){var d=document.createElement('div');d.className='t';d.textContent=m;$('#toast').appendChild(d);setTimeout(function(){d.remove()},2300)}
+function readImg(file,max,q){return new Promise(function(res,rej){var fr=new FileReader();fr.onerror=rej;fr.onload=function(){var im=new Image();im.onerror=rej;im.onload=function(){var r=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q))};im.src=fr.result};fr.readAsDataURL(file)})}
+function twoTap(el,fn){if(el.dataset.armed){clearTimeout(el._t);delete el.dataset.armed;fn();return}el.dataset.armed='1';el._h=el.innerHTML;el.textContent=t('confirmDelete');el._t=setTimeout(function(){delete el.dataset.armed;el.innerHTML=el._h},3000)}
+
+/* ---------- audio ---------- */
+var AC=null;
+function actx(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();return AC}catch(e){return null}}
+function tone(f,t0,dur,type,vol){var c=actx();if(!c)return;var o=c.createOscillator(),g=c.createGain();o.type=type||'square';o.frequency.value=f;g.gain.setValueAtTime(0.0001,t0);g.gain.linearRampToValueAtTime(vol||.05,t0+.012);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+dur+.03)}
+function sweep(t0,dur){var c=actx();if(!c)return;var o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(180,t0);o.frequency.exponentialRampToValueAtTime(880,t0+dur);g.gain.setValueAtTime(.0001,t0);g.gain.linearRampToValueAtTime(.07,t0+dur*.6);g.gain.exponentialRampToValueAtTime(.0001,t0+dur+.1);o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+dur+.12)}
+function splashSound(full){var c=actx();if(!c||!S.settings.sound||c.state!=='running')return false;var n=c.currentTime+.05;
+ if(full){sweep(n+.1,.75);[[392,.85],[523.25,1.0],[659.25,1.15]].forEach(function(a){tone(a[0],n+a[1],.16,'square',.04)});[523.25,659.25,783.99,1046.5].forEach(function(f){tone(f,n+1.45,1.1,'triangle',.05)})}
+ else{[523.25,659.25,783.99,1046.5].forEach(function(f,i){tone(f,n+i*.07,.5,'triangle',.05)})}
+ return true}
+function blip(f){var c=AC;if(!c||c.state!=='running'||!S.settings.sound)return;tone(f||620,c.currentTime,.09,'triangle',.035)}
+
+/* ---------- theme ---------- */
+function applyTheme(){var r=document.documentElement,m=S.settings.mode;if(m==='system')r.removeAttribute('data-theme');else r.setAttribute('data-theme',m);var a=ACC[S.settings.accent]||ACC.ember;r.style.setProperty('--accent',a[0]);r.style.setProperty('--accent-ink',a[1]);r.lang=S.settings.lang}
+
+/* ---------- navigation + views ---------- */
+function buildNav(){$('#navRow').innerHTML='<div class="ind" id="ind"><i></i></div>'+TABS.map(function(k){return '<button class="nb" data-a="tab" data-t="'+k+'" aria-label="'+t('nav_'+k)+'"><span class="i">'+ic(k,22)+'</span>'+t('nav_'+k)+'</button>'}).join('');setNav()}
+function setNav(){$$('.nb').forEach(function(b){b.classList.toggle('on',b.dataset.t===ui.tab)});var i=$('#ind');if(i)i.style.transform='translateX('+TABS.indexOf(ui.tab)*100+'%)'}
+function go(tab){if(tab===ui.tab)return;var from=TABS.indexOf(ui.tab),to=TABS.indexOf(tab);ui.tab=tab;setNav();blip(480+to*90);var v=$('#view');v.className='view out';setTimeout(function(){renderView();v.className='view '+(to>from?'inr':'inl')},120)}
+function renderView(){var v=$('#view');var fn={home:viewHome,explore:viewExplore,review:viewReview,settings:viewSettings}[ui.tab];v.innerHTML=fn();if(ui.tab==='home')updateHome();if(ui.tab==='explore')updateExplore()}
+function refresh(){if(!S.profile)return;var sc=$('#view .scroll'),y=sc?sc.scrollTop:0;renderView();var s2=$('#view .scroll');if(s2)s2.scrollTop=y}
+
+/* ---------- HOME ---------- */
+function viewHome(){var p=S.profile,d=new Date().toLocaleDateString(S.settings.lang==='id'?'id-ID':'en-GB',{weekday:'long',day:'numeric',month:'long'});
+return '<div class="top gx"><div class="who">'+avatarHTML(p,42)+'<div style="min-width:0"><div class="eyebrow">'+esc(d)+'</div><h1>'+esc(p.name)+'</h1></div></div><button class="iconbtn" data-a="sheet-add" aria-label="'+t('addGame')+'">'+ic('plus')+'</button></div>'+
+'<div class="scroll"><div class="gx page">'+
+'<div class="basis"><div class="seg" role="group" aria-label="'+t('playBasis')+'">'+BASIS.map(function(b){return '<button data-a="basis" data-b="'+b+'">'+t('basis_'+b)+'</button>'}).join('')+'</div></div>'+
+'<div class="cats" id="cats"></div><div class="total" id="total"></div>'+
+'<div class="tools"><label class="search">'+ic('search',18)+'<input id="homeQ" data-i="homeQ" type="search" placeholder="'+t('searchLibrary')+'" value="'+esc(ui.q)+'"></label>'+
+'<button class="iconbtn" data-a="sheet-filter" aria-label="'+t('filters')+'">'+ic('filter')+'<span class="dot" id="fdot" hidden></span></button>'+
+'<button class="iconbtn" data-a="toggle-view" id="vbtn" aria-label="View">'+ic(ui.view==='grid'?'list':'grid')+'</button></div>'+
+'<div class="list-head" id="listHead"></div><div id="gameList"></div></div></div>'}
+function catsHTML(){return STATUSES.map(function(s,i){var gs=S.games.filter(function(g){return g.status===s}),h=gs.reduce(function(a,g){return a+hoursFor(g)},0);
+return '<button class="cat'+(ui.status===s?' on':'')+'" style="--c:var(--c-'+s+');--i:'+i+'" data-a="cat" data-s="'+s+'"><span class="cat-ic">'+ic(CATIC[s],18)+'</span><span class="cat-n">'+gs.length+'</span><span class="cat-l">'+t('st_'+s)+'</span><span class="cat-h">'+fmtH(h)+'</span></button>'}).join('')}
+function filtered(){var q=ui.q.trim().toLowerCase();var a=S.games.filter(function(g){return (!ui.status||g.status===ui.status)&&(!ui.plats.length||ui.plats.indexOf(g.platform)>=0)&&(!ui.genres.length||ui.genres.some(function(x){return g.genres.indexOf(x)>=0}))&&(!q||g.title.toLowerCase().indexOf(q)>=0||(g.dev||'').toLowerCase().indexOf(q)>=0)});
+var cmp={added:function(a,b){return b.added-a.added},title:function(a,b){return a.title.localeCompare(b.title)},hours:function(a,b){return hoursFor(b)-hoursFor(a)},rating:function(a,b){return (b.review?avg(b.review):-1)-(a.review?avg(a.review):-1)},year:function(a,b){return (b.year||0)-(a.year||0)}}[ui.sort];return a.sort(cmp)}
+function gameCard(g){return '<button class="gcard" data-a="open-game" data-id="'+g.id+'"><div class="cv">'+coverHTML(g)+'<span class="sb" style="--c:var(--c-'+g.status+')">'+t('st_'+g.status)+'</span>'+(g.full100?'<span class="med">'+ic('medal',15)+'</span>':'')+'</div><div class="gt">'+esc(g.title)+'</div><div class="gm"><span>'+esc(g.platform||'')+'</span><span class="mono">'+fmtH(hoursFor(g),1)+'</span></div></button>'}
+function gameRow(g){var h=hoursFor(g),pr=g.played&&h?Math.min(100,g.played/h*100):0;
+return '<button class="grow" data-a="open-game" data-id="'+g.id+'"><div class="rcv">'+coverHTML(g)+'</div><div class="gi"><div class="gt">'+esc(g.title)+(g.full100?'<span class="medi">'+ic('medal',15)+'</span>':'')+'</div><div class="gm"><span>'+esc(g.platform||'')+(g.year?' · '+g.year:'')+'</span></div><div class="pbar"><i style="width:'+pr+'%;background:var(--c-'+g.status+')"></i></div></div><div class="gr"><span class="pill" style="--c:var(--c-'+g.status+')">'+t('st_'+g.status)+'</span><span class="mono sm">'+fmtH(h,1)+'</span></div></button>'}
+function updateHome(){var c=$('#cats');if(!c)return;c.innerHTML=catsHTML();
+$$('.basis button').forEach(function(b){b.classList.toggle('on',b.dataset.b===S.settings.basis)});
+var tot=S.games.reduce(function(a,g){return a+hoursFor(g)},0);$('#total').textContent=S.games.length+' '+t('gamesWord')+' · '+fmtH(tot)+' · '+t('basis_'+S.settings.basis);
+var list=filtered(),active=ui.status||ui.plats.length||ui.genres.length||ui.q;
+$('#fdot').hidden=!(ui.plats.length||ui.genres.length||ui.sort!=='added');
+$('#listHead').innerHTML='<h2>'+(ui.status?t('st_'+ui.status):t('all'))+'<span class="count">'+list.length+'</span></h2>'+(active?'<button class="link" data-a="clear-f">'+t('reset')+'</button>':'');
+var gl=$('#gameList');
+if(!S.games.length)gl.innerHTML=empty(t('emptyLib'),t('emptyLibHint'));
+else if(!list.length)gl.innerHTML=empty(t('noGames'),'','search');
+else gl.innerHTML=ui.view==='grid'?'<div class="ggrid">'+list.map(gameCard).join('')+'</div>':'<div class="glist">'+list.map(gameRow).join('')+'</div>'}
+
+/* ---------- sheets ---------- */
+function openSheet(html){var s=$('#sheet');s.innerHTML='<div class="sheet" role="dialog" aria-modal="true">'+html+'</div>';s.classList.add('on')}
+function closeSheet(){var s=$('#sheet');if(!s.classList.contains('on'))return;s.classList.remove('on');s.innerHTML='';ui.sh=null;ui.rv=null;ui.xa=null;ui.pf=null;refresh()}
+function chipsHTML(list,sel,act,multi){return list.map(function(x){return '<button class="chip'+(sel.indexOf(x)>=0?' on':'')+'" data-a="'+act+'" data-v="'+esc(x)+'">'+esc(x)+'</button>'}).join('')}
+function filterSheet(){return '<div class="grab"></div><div class="gx sh"><div class="sh-title"><h2>'+t('filters')+'</h2><button class="link" data-a="f-reset">'+t('reset')+'</button></div>'+
+'<div><div class="lab">'+t('sort')+'</div><div class="chips">'+['added','title','hours','rating','year'].map(function(k){return '<button class="chip'+(ui.sort===k?' on':'')+'" data-a="f-sort" data-v="'+k+'">'+t('sort_'+k)+'</button>'}).join('')+'</div></div>'+
+'<div><div class="lab">'+t('status')+'</div><div class="chips">'+STATUSES.map(function(s){return '<button class="chip'+(ui.status===s?' on':'')+'" style="--c:var(--c-'+s+')" data-a="f-status" data-s="'+s+'">'+t('st_'+s)+'</button>'}).join('')+'</div></div>'+
+'<div><div class="lab">'+t('platform')+'</div><div class="chips">'+chipsHTML(allPlats(),ui.plats,'f-plat')+'</div></div>'+
+'<div><div class="lab">'+t('genre')+'</div><div class="chips">'+chipsHTML(allGens(),ui.genres,'f-genre')+'</div></div>'+
+'<button class="btn primary wide" data-a="close-sheet">'+t('done')+'</button></div>'}
+function curG(){return ui.sh&&(ui.sh.draft||S.games.find(function(x){return x.id===ui.sh.id}))}
+function detailSheet(g){var plats=allPlats();if(g.platform&&plats.indexOf(g.platform)<0)plats.push(g.platform);var h=g.hltb||{};
+var hrs2=BASIS.filter(function(b){return h[b]}).map(function(b){return '<span class="tag">'+t('basis_'+b)+' '+fmtH(h[b])+'</span>'}).join('');
+var shots=(g.shots||[]).map(function(u){return {u:u,k:'shots'}}).concat((g.gallery||[]).map(function(u){return {u:u,k:'gallery'}}));var ci={shots:-1,gallery:-1};
+return '<div class="grab"></div><div class="gx sh">'+
+'<div class="sh-head"><div class="rcv big">'+coverHTML(g)+'</div><div class="grow1"><h2 class="dt">'+esc(g.title)+(g.full100?'<span class="medi">'+ic('medal',16)+'</span>':'')+'</h2><div class="muted">'+[g.year,g.dev].filter(Boolean).map(esc).join(' · ')+'</div>'+tagsHTML(g.genres)+'</div><button class="iconbtn sm" data-a="close-sheet" aria-label="'+t('close')+'">'+ic('close',18)+'</button></div>'+
+'<div><div class="lab">'+t('status')+'</div><div class="stiles" id="dStatus">'+STATUSES.map(function(s){return '<button class="stile'+(g.status===s?' on':'')+'" style="--c:var(--c-'+s+')" data-a="d-status" data-s="'+s+'" aria-pressed="'+(g.status===s)+'">'+ic(CATIC[s],22)+'<span>'+t('st_'+s)+'</span></button>'}).join('')+'</div></div>'+
+'<div><div class="lab">'+t('platform')+'</div><div class="chips" id="dPlat">'+plats.map(function(x){return '<button class="chip'+(g.platform===x?' on':'')+'" data-a="d-plat" data-v="'+esc(x)+'">'+esc(x)+'</button>'}).join('')+'<button class="chip" data-a="d-plat-new">+ '+t('addPlatform')+'</button></div>'+
+'<form class="row" id="dPlatForm" data-f="g-plat-add" hidden style="margin-top:10px"><input class="fld" name="v" maxlength="28" placeholder="'+t('addPlatform')+'" aria-label="'+t('addPlatform')+'"><button class="btn sm primary" type="submit">'+t('add')+'</button></form></div>'+
+(hrs2?'<div><div class="lab">'+t('playtime')+'</div><div class="tags" style="margin-top:0">'+hrs2+'</div></div>':'')+
+'<div><div class="lab">'+t('about_game')+'</div><p class="muted" style="font-size:15px">'+esc(g.summary||t('noSummary'))+'</p></div>'+
+(shots.length?'<div><div class="lab">'+t('screenshots')+'</div><div class="car">'+shots.map(function(x){var n=++ci[x.k];return '<button class="shotw big" data-a="shot-view" data-id="'+g.id+'" data-n="'+n+'" data-k="'+x.k+'"><img class="rimg" src="'+esc(x.u)+'" alt="" loading="lazy"></button>'}).join('')+'</div></div>':'')+
+'<button class="btn wide" data-a="g-edit">'+ic('settings',18)+t('editInfo')+'</button></div>'}
+function gameSheet(g,isNew){var plats=allPlats();if(g.platform&&plats.indexOf(g.platform)<0)plats.push(g.platform);var gens=allGens();g.genres.forEach(function(x){if(gens.indexOf(x)<0)gens.push(x)});var h=g.hltb||{};
+return '<div class="grab"></div><div class="gx sh">'+
+'<div class="sh-head"><button class="rcv big covbtn" data-a="g-cover" aria-label="'+t('coverPick')+'">'+coverHTML(g)+'</button><div class="grow1"><label class="lab" for="gTitle">'+t('title')+'</label><input id="gTitle" class="fld" data-i="g-title" value="'+esc(g.title)+'" autocomplete="off"></div><button class="iconbtn sm" data-a="'+(isNew?'close-sheet':'g-back')+'" aria-label="'+t('close')+'">'+ic('close',18)+'</button></div>'+
+'<div class="grid2"><button class="btn sm" data-a="g-cover">'+ic('image',16)+t('coverPick')+'</button>'+(g.cover?'<button class="btn sm" data-a="g-cover-del">'+t('coverRemove')+'</button>':'<span></span>')+'</div>'+
+'<div><label class="lab" for="gDev">'+t('developer')+'</label><input id="gDev" class="fld" data-i="g-dev" value="'+esc(g.dev||'')+'" autocomplete="off"></div>'+
+'<div><div class="lab">'+t('status')+'</div><div class="chips" id="gStatus">'+STATUSES.map(function(s){return '<button class="chip'+(g.status===s?' on':'')+'" style="--c:var(--c-'+s+')" data-a="g-status" data-s="'+s+'">'+t('st_'+s)+'</button>'}).join('')+'</div></div>'+
+'<div class="grid2"><div><label class="lab" for="gPlat">'+t('platform')+'</label><select id="gPlat" class="fld" data-c="g-plat"><option value="">—</option>'+plats.map(function(p){return '<option'+(g.platform===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'+
+'<div><label class="lab" for="gYear">'+t('year')+'</label><input id="gYear" class="fld" type="number" inputmode="numeric" data-c="g-year" value="'+esc(g.year)+'"></div></div>'+
+'<div><div class="lab">'+t('genre')+'</div><div class="chips">'+gens.map(function(x){return '<button class="chip'+(g.genres.indexOf(x)>=0?' on':'')+'" data-a="g-genre" data-v="'+esc(x)+'">'+esc(x)+'</button>'}).join('')+'</div></div>'+
+'<div><label class="lab" for="gSum">'+t('about_game')+'</label><textarea id="gSum" class="fld" data-i="g-sum">'+esc(g.summary||'')+'</textarea></div>'+
+'<div><div class="lab">'+t('hltb')+'</div><div class="grid3">'+BASIS.map(function(b){return '<div><label class="sm muted" for="gh_'+b+'">'+t(b)+'</label><input id="gh_'+b+'" class="fld mono" type="number" min="0" step="0.5" inputmode="decimal" data-c="g-num" data-f="'+b+'" value="'+(h[b]||'')+'"></div>'}).join('')+'</div>'+
+'<button class="btn sm" style="margin-top:10px" data-a="g-lookup">'+ic('search',16)+t('syncIGDB')+'</button></div>'+
+'<div><label class="lab" for="gPlayed">'+t('played')+'</label><input id="gPlayed" class="fld mono" type="number" min="0" step="0.5" inputmode="decimal" data-c="g-num" data-f="played" value="'+(g.played||'')+'"></div>'+
+(isNew?'<button class="btn primary wide" data-a="g-add">'+ic('plus',18)+t('addToLib')+'</button>':
+'<div class="grid2"><button class="btn" data-a="g-review">'+ic('review',18)+(g.review?t('editReview')+' · '+avg(g.review).toFixed(1):t('writeReview'))+'</button><button class="btn" data-a="g-shot">'+ic('image',18)+t('addShot')+'</button></div><button class="btn danger wide" data-a="g-del">'+ic('trash',18)+t('delete')+'</button><button class="btn primary wide" data-a="g-back">'+ic('check',18)+t('done')+'</button>')+
+'</div>'}
+function addSheet(c){var plats=c.platforms&&c.platforms.length?c.platforms:allPlats();var dp=(S.profile&&plats.indexOf(S.profile.platform)>=0)?S.profile.platform:plats[0];ui.xa={item:c,status:'backlog',platform:dp};
+openSheet(addSheetHTML())}
+function addSheetHTML(){var x=ui.xa,c=x.item,plats=c.platforms&&c.platforms.length?c.platforms:allPlats();
+return '<div class="grab"></div><div class="gx sh"><div class="sh-head"><div class="rcv big">'+coverHTML(c)+'</div><div class="grow1"><div class="gt" style="font-size:18px">'+esc(c.title)+'</div><div class="muted sm">'+(c.year||'')+(c.dev?' · '+esc(c.dev):'')+'</div></div><button class="iconbtn sm" data-a="close-sheet" aria-label="'+t('close')+'">'+ic('close',18)+'</button></div>'+
+'<div><div class="lab">'+t('status')+'</div><div class="chips">'+STATUSES.map(function(s){return '<button class="chip'+(x.status===s?' on':'')+'" style="--c:var(--c-'+s+')" data-a="xa-status" data-s="'+s+'">'+t('st_'+s)+'</button>'}).join('')+'</div></div>'+
+'<div><div class="lab">'+t('platform')+'</div><div class="chips">'+plats.map(function(p){return '<button class="chip'+(x.platform===p?' on':'')+'" data-a="xa-plat" data-v="'+esc(p)+'">'+esc(p)+'</button>'}).join('')+'</div></div>'+
+'<button class="btn primary wide" data-a="xa-go">'+ic('plus',18)+t('addToLib')+'</button></div>'}
+function pickSheet(mode){ui.pick=mode;var gs=S.games.slice().sort(function(a,b){return a.title.localeCompare(b.title)});
+if(!gs.length){toast(t('noLibForReview'));return}
+openSheet('<div class="grab"></div><div class="gx sh"><div class="sh-title"><h2>'+t('pickGame')+'</h2><button class="iconbtn sm" data-a="close-sheet" aria-label="'+t('close')+'">'+ic('close',18)+'</button></div><div class="glist">'+gs.map(function(g){return '<button class="grow" data-a="pick-go" data-id="'+g.id+'"><div class="rcv">'+coverHTML(g)+'</div><div class="gi"><div class="gt">'+esc(g.title)+'</div><div class="gm"><span>'+t('st_'+g.status)+'</span></div></div>'+(g.review?'<span class="mono sm">'+avg(g.review).toFixed(1)+'</span>':'')+'</button>'}).join('')+'</div></div>')}
+function reviewSheet(id){var g=S.games.find(function(x){return x.id===id});if(!g)return;var r=g.review||{visual:7,gameplay:7,audio:7,design:7,text:''};
+ui.rv={id:id,visual:r.visual,gameplay:r.gameplay,audio:r.audio,design:r.design,text:r.text||'',full:!!g.full100};var sc=avg(ui.rv);
+openSheet('<div class="grab"></div><div class="gx sh"><div class="sh-head"><div class="rcv big">'+coverHTML(g)+'</div><div class="grow1"><div class="gt" style="font-size:18px">'+esc(g.title)+'</div><div class="muted sm">'+t('finalScore')+'</div></div><div class="ring big" id="rvRing" style="--p:'+sc*10+'"><span id="rvScore">'+sc.toFixed(1)+'</span></div></div>'+
+CATS4.map(function(k){return '<div class="sl"><div class="slh"><label for="sl_'+k+'">'+t(k)+'</label><b class="mono" id="v_'+k+'">'+ui.rv[k]+'</b></div><input id="sl_'+k+'" type="range" min="0" max="10" step="0.5" value="'+ui.rv[k]+'" style="--fill:'+ui.rv[k]*10+'%" data-i="rv-'+k+'"></div>'}).join('')+
+'<div><label class="lab" for="rvText">'+t('yourThoughts')+'</label><textarea id="rvText" class="fld" data-i="rv-text">'+esc(ui.rv.text)+'</textarea></div>'+
+'<div class="row"><div><b>'+t('full100')+'</b><div class="muted sm">'+t('full100Hint')+'</div></div><button class="sw'+(ui.rv.full?' on':'')+'" id="rvFull" role="switch" aria-checked="'+ui.rv.full+'" data-a="rv-full" aria-label="'+t('full100')+'"></button></div>'+
+'<button class="btn primary wide" data-a="rv-save">'+ic('check',18)+t('save')+'</button>'+(g.review?'<button class="btn danger wide" data-a="rv-del">'+ic('trash',18)+t('delete')+'</button>':'')+'</div>')}
+
+/* ---------- EXPLORE ---------- */
+var PAGE=30;
+function newList(){return {q:'',items:[],state:'idle',err:'',offset:0,more:false,busy:false}}
+function cleanQ(q){return q.replace(/["\\]/g,' ').slice(0,80)}
+function liveFetch(off){return igdbQuery('search "'+cleanQ(ui.live.q)+'"; where version_parent = null; limit '+PAGE+'; offset '+off+';')}
+function topFetch(off){return igdbQuery('where total_rating_count > 100 & version_parent = null; sort total_rating_count desc; limit '+PAGE+'; offset '+off+';')}
+function loadList(key,fetchFn,more){var st=ui[key];
+if(more){if(st.busy)return;st.busy=true}else{st=ui[key]={q:ui.exQ.trim(),items:[],state:'loading',err:'',offset:0,more:false,busy:false}}
+var off=more?st.offset:0;updateExplore();
+fetchFn(off).then(function(items){if(ui[key]!==st)return;var seen={};st.items.forEach(function(c){seen[c.igdbId]=1});items.forEach(function(c){if(!seen[c.igdbId]){st.items.push(c);seen[c.igdbId]=1}});st.offset+=items.length;st.more=items.length>=PAGE;st.state='ok';st.err='';st.busy=false;updateExplore()})
+.catch(function(e){if(ui[key]!==st)return;igdbFail(e);st.err=ui.igdbErr;if(!more)st.state='err';st.busy=false;updateExplore()})}
+function viewExplore(){
+return '<div class="top gx"><h1>'+t('explore')+'</h1></div><div class="scroll"><div class="gx page ex">'+
+'<label class="search">'+ic('search',20)+'<input id="exQ" data-i="exQ" type="search" placeholder="'+t('searchCatalog')+'" value="'+esc(ui.exQ)+'"></label>'+
+'<div id="exAI"></div><div id="exBody"></div></div></div>'}
+function xRow(c,note){ui.xmap[c.cid]=c;var lib=findLib(c.title);
+return '<div class="xrow"><div class="xmain" data-a="x-info" data-k="'+esc(c.cid)+'" role="button" tabindex="0"><div class="rcv">'+coverHTML(c)+'</div><div class="xi"><div class="gt">'+esc(c.title)+'</div><div class="muted">'+(c.year||'')+(c.dev?' · '+esc(c.dev):'')+'</div>'+(c.platforms&&c.platforms.length?'<div class="sm muted">'+esc(c.platforms.join(' · '))+'</div>':'')+(note?'<div class="sm muted">'+esc(note)+'</div>':'')+'</div></div>'+
+(lib?'<span class="pill" style="--c:var(--c-'+lib.status+')">'+t('st_'+lib.status)+'</span>':'<button class="btn sm primary" data-a="x-add" data-k="'+esc(c.cid)+'">'+ic('plus',16)+t('add')+'</button>')+'</div>'}
+function listBlock(title,st,moreAct){var h='<div class="row" style="margin-bottom:10px"><h2 class="gh">'+title+(st.items.length?'<span class="count">'+st.items.length+'</span>':'')+'</h2></div>';
+if((st.state==='loading'||st.state==='idle')&&!st.items.length)return h+'<div class="row"><span class="muted">IGDB</span><span class="dots"><i></i><i></i><i></i></span></div>';
+if(st.state==='err'&&!st.items.length)return h+'<p style="color:var(--c-abandoned)">'+esc(st.err||'IGDB error')+'</p>';
+if(!st.items.length)return h+empty(t('noResults'),'','search');
+return h+'<div class="xlist">'+st.items.map(function(c){return xRow(c)}).join('')+'</div>'+(st.err?'<p class="sm" style="margin-top:10px;color:var(--c-abandoned)">'+esc(st.err)+'</p>':'')+(st.more?'<button class="btn wide" style="margin-top:12px" data-a="'+moreAct+'">'+(st.busy?'…':t('loadMore'))+'</button>':'')}
+function updateExplore(){var body=$('#exBody');if(!body)return;ui.xmap={};renderAI();
+if(!igdbOn()){body.innerHTML='<div class="empty">'+ic('search',34)+'<b>'+t('connectTitle')+'</b><span>'+t('connectHint')+'</span><button class="btn primary" style="margin-top:10px" data-a="tab" data-t="settings">'+t('nav_settings')+'</button></div>';return}
+var q=ui.exQ.trim();
+if(q.length>=3){body.innerHTML=listBlock(t('results'),ui.live,'more-live');return}
+if(ui.top.state==='idle'){loadList('top',topFetch,false);return}
+body.innerHTML=listBlock(t('topRated'),ui.top,'more-top')}
+function shotsHTML(arr,k,id){return '<div><div class="lab">'+t('screenshots')+'</div><div class="car">'+arr.map(function(u,i){return '<button class="shotw big" data-a="shot-view" data-id="'+esc(id||'')+'" data-n="'+i+'" data-k="'+k+'"><img class="rimg" src="'+esc(u)+'" alt="" loading="lazy"></button>'}).join('')+'</div></div>'}
+function tagsHTML(a){return a&&a.length?'<div class="tags">'+a.slice(0,5).map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join('')+'</div>':''}
+function infoSheet(c){ui.xi=c;var lib=findLib(c.title);
+return '<div class="grab"></div><div class="gx sh"><div class="sh-head"><div class="rcv big">'+coverHTML(c)+'</div><div class="grow1"><h2 class="dt">'+esc(c.title)+'</h2><div class="muted">'+[c.year,c.dev].filter(Boolean).map(esc).join(' · ')+'</div>'+tagsHTML(c.genres)+'</div><button class="iconbtn sm" data-a="close-sheet" aria-label="'+t('close')+'">'+ic('close',18)+'</button></div>'+
+(c.platforms&&c.platforms.length?'<div><div class="lab">'+t('platform')+'</div><div class="tags" style="margin-top:0">'+c.platforms.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join('')+'</div></div>':'')+
+'<div><div class="lab">'+t('about_game')+'</div><p class="muted" style="font-size:15px">'+esc(c.summary||t('noSummary'))+'</p></div>'+
+(c.shots&&c.shots.length?shotsHTML(c.shots,'xi',''):'')+
+(lib?'<span class="pill" style="--c:var(--c-'+lib.status+')">'+t('inLib')+' · '+t('st_'+lib.status)+'</span>':'<button class="btn primary wide" data-a="xi-add">'+ic('plus',18)+t('addToLib')+'</button>')+'</div>'}
+function renderAI(){var el=$('#exAI');if(!el)return;var a=ui.ai,q=norm(ui.exQ);if(q.length>=3){el.innerHTML='';return}
+var body='';
+if(a.state==='loading')body='<div class="row"><span>'+t('aiThinking')+'</span><span class="dots"><i></i><i></i><i></i></span></div>';
+else if(a.state==='nokey')body='<p class="muted sm">'+t('aiNeedsKey')+'</p>';
+else if(a.state==='err')body='<p class="muted sm">'+t('aiFail')+'</p>';
+else if(a.state==='ok')body='<div class="xlist">'+a.items.map(function(c){return xRow(c,c.reason)}).join('')+'</div>';
+el.innerHTML='<div class="ai"><div class="row"><div style="display:flex;gap:8px;align-items:center;color:var(--accent)">'+ic('spark',20)+'<b style="color:var(--fg)">'+t('aiTitle')+'</b></div><div style="display:flex;gap:8px;align-items:center"><button class="btn sm" data-a="x-ai">'+t('askAI')+'</button>'+(a.state!=='idle'?'<button class="iconbtn sm" data-a="ai-close" aria-label="'+t('close')+'">'+ic('close',18)+'</button>':'')+'</div></div>'+body+'</div>'}
+function askGemini(){if(!S.settings.geminiKey){ui.ai={state:'nokey',items:[]};renderAI();return}
+ui.ai={state:'loading',items:[]};renderAI();
+var lib=S.games.filter(function(g){return g.status!=='wishlist'}).map(function(g){return g.title+' ('+t('st_'+g.status)+(g.review?', score '+avg(g.review):'')+')'}).join('; ')||'none yet';
+var owned=S.games.map(function(g){return g.title}).join('; ')||'none';
+var prompt='You recommend video games. The player library: '+lib+'. Never suggest any of these titles: '+owned+'. Return 6 games they would enjoy as a JSON array of objects with keys title, year (number), genres (array of strings), reason (one sentence, max 20 words, written in '+(S.settings.lang==='id'?'Indonesian':'English')+').';
+fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(S.settings.geminiModel||'gemini-3.8-flash')+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':S.settings.geminiKey},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json'}})})
+.then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})
+.then(function(j){var arr=JSON.parse(j.candidates[0].content.parts[0].text);var items=arr.slice(0,6).map(function(x,i){return {cid:'a'+i,title:String(x.title),year:x.year||'',dev:'',genres:Array.isArray(x.genres)?x.genres:[],platforms:[],hltb:{main:0,extra:0,comp:0},reason:x.reason||''}});
+return Promise.all(items.map(function(it){return igdbOn()?igdbSearch(it.title).then(function(r){var m=bestMatch(r,it.title);if(m){it.cover=m.cover;it.summary=m.summary;it.shots=m.shots;it.igdbId=m.igdbId;if(!it.dev)it.dev=m.dev;if(m.platforms.length)it.platforms=m.platforms;if(m.hltb&&m.hltb.main&&!(it.hltb&&it.hltb.main))it.hltb=m.hltb}return it}):Promise.resolve(it)})).then(function(done){ui.ai={state:'ok',items:done};renderAI()})})
+.catch(function(){ui.ai={state:'err',items:[]};renderAI()})}
+var GMAP={'Role-playing (RPG)':'RPG','Platform':'Platformer','Simulator':'Simulation','Sport':'Sports','Real Time Strategy (RTS)':'Strategy','Turn-based strategy (TBS)':'Strategy',"Hack and slash/Beat 'em up":'Action','Point-and-click':'Adventure'};
+function mapPlat(a){a=String(a||'');if(/ps5/i.test(a))return 'PS5';if(/ps4/i.test(a))return 'PS4';if(/xone|series|xbox/i.test(a))return 'Xbox';if(/switch/i.test(a))return 'Switch';if(/android|ios/i.test(a))return 'Mobile';if(/pc|win/i.test(a))return 'PC';return 'Other'}
+function igdbOn(){var c=S.settings;return !!(c.igdbClientId&&c.igdbClientSecret)}
+// Every request goes through the Proxy URL setting: proxy + encodeURIComponent(target). Empty proxy = direct call.
+function viaProxy(u){var p=(S.settings.proxyUrl||'').trim();return p?p+encodeURIComponent(u):u}
+var IFIELDS='name,first_release_date,summary,cover.image_id,screenshots.image_id,genres.name,platforms.abbreviation,involved_companies.company.name,involved_companies.developer';
+var IMGB='https://images.igdb.com/igdb/image/upload/';
+var directTok=null,directExp=0;
+function directToken(){var c=S.settings;if(directTok&&Date.now()<directExp)return Promise.resolve(directTok);
+var tu='https://id.twitch.tv/oauth2/token?client_id='+encodeURIComponent(c.igdbClientId)+'&client_secret='+encodeURIComponent(c.igdbClientSecret)+'&grant_type=client_credentials';
+return fetch(viaProxy(tu),{method:'POST'}).then(function(r){if(!r.ok)throw new Error('Twitch login failed ('+r.status+'). Check the Client ID and Secret.');return r.json()}).then(function(j){if(!j||!j.access_token)throw new Error('Twitch login failed. Check the Client ID and Secret.');directTok=j.access_token;directExp=Date.now()+Math.max(60,(j.expires_in||3600)-300)*1000;return directTok})}
+function igdbPost(ep,body){var c=S.settings;return directToken().then(function(tok){return fetch(viaProxy('https://api.igdb.com/v4/'+ep),{method:'POST',headers:{'Client-ID':c.igdbClientId,'Authorization':'Bearer '+tok,'Accept':'application/json'},body:body})}).then(function(r){if(r.status===401)directTok=null;if(!r.ok)throw new Error('IGDB error '+r.status);return r.json()})}
+function toItem(g){var co=g.involved_companies||[],dv=co.find(function(c){return c.developer})||co[0];
+return {cid:'i'+g.id,igdbId:g.id,title:g.name,year:g.first_release_date?new Date(g.first_release_date*1000).getUTCFullYear():'',dev:dv&&dv.company?dv.company.name:'',
+genres:(g.genres||[]).map(function(x){return GMAP[x.name]||x.name}),
+platforms:(g.platforms||[]).map(function(x){return x.abbreviation}).filter(Boolean).map(mapPlat).filter(function(v,i,a){return a.indexOf(v)===i}),
+cover:g.cover&&g.cover.image_id?IMGB+'t_cover_big/'+g.cover.image_id+'.jpg':'',summary:g.summary||'',
+shots:(g.screenshots||[]).slice(0,8).map(function(x){return IMGB+'t_screenshot_big/'+x.image_id+'.jpg'}),hltb:{main:0,extra:0,comp:0}}}
+async function igdbTest(){var c=S.settings,out=[],show=function(){var el=$('#testOut');if(el)el.textContent=out.join('\n')},last=function(x){out[out.length-1]=x;show()};
+if(!c.igdbClientId||!c.igdbClientSecret){out.push('Enter the Client ID and Client Secret first.');show();return}
+out.push('Proxy: '+((c.proxyUrl||'').trim()||'none (direct)'));out.push('1. Twitch login...');show();var tok;
+try{var tu='https://id.twitch.tv/oauth2/token?client_id='+encodeURIComponent(c.igdbClientId)+'&client_secret='+encodeURIComponent(c.igdbClientSecret)+'&grant_type=client_credentials';
+var r=await fetch(viaProxy(tu),{method:'POST'}),tx=await r.text();
+if(!r.ok){last('✗ 1. Twitch login: HTTP '+r.status+' '+tx.slice(0,200));return}
+var j;try{j=JSON.parse(tx)}catch(e){last('✗ 1. The proxy did not return JSON (it may be showing its own page): '+tx.slice(0,200));return}
+if(!j.access_token){last('✗ 1. No token in the reply: '+tx.slice(0,200));return}tok=j.access_token;last('✓ 1. Twitch login OK')}
+catch(e){last('✗ 1. The request never completed ('+(e&&e.message||e)+'). The browser blocked it, the proxy refused this site, or you are offline.');return}
+out.push('2. IGDB query...');show();
+try{var r2=await fetch(viaProxy('https://api.igdb.com/v4/games'),{method:'POST',headers:{'Client-ID':c.igdbClientId,'Authorization':'Bearer '+tok,'Accept':'application/json'},body:'fields name; limit 1;'}),t2=await r2.text();
+if(!r2.ok){last('✗ 2. IGDB: HTTP '+r2.status+' '+t2.slice(0,200));return}
+last('✓ 2. IGDB OK '+t2.replace(/\s+/g,' ').slice(0,80))}
+catch(e){last('✗ 2. The request never completed ('+(e&&e.message||e)+'). The proxy may drop the Authorization or Client-ID headers, or refuses this site.')}}
+function igdbQuery(where){return igdbPost('games','fields '+IFIELDS+'; '+where).then(function(a){ui.igdbErr='';return a.map(toItem)})}
+function igdbFail(e){ui.igdbErr=(e&&e.name==='TypeError')?t('igdbBlocked'):((e&&e.message)||'IGDB error');return []}
+function igdbSearch(q){if(!igdbOn())return Promise.resolve([]);return igdbQuery('search "'+q.replace(/["\\]/g,' ').slice(0,80)+'"; where version_parent = null; limit 10;').catch(igdbFail)}
+function igdbTop(){if(!igdbOn())return Promise.resolve([]);return igdbQuery('where total_rating_count > 100 & version_parent = null; sort total_rating_count desc; limit 20;')}
+function bestMatch(items,title){var n=norm(title);return items.find(function(i){return norm(i.title)===n})||items[0]||null}
+function applyInfo(g,x){if(x.cover)g.cover=x.cover;if(x.summary)g.summary=x.summary;if(x.shots&&x.shots.length)g.shots=x.shots;if(!g.year&&x.year)g.year=x.year;if(!g.dev&&x.dev)g.dev=x.dev;if(!g.genres.length&&x.genres&&x.genres.length)g.genres=x.genres.slice();if(x.hltb&&x.hltb.main&&!(g.hltb&&g.hltb.main))g.hltb=Object.assign({},x.hltb);if(x.igdbId)g.igdbId=x.igdbId}
+function syncGame(g){var p=igdbOn()?igdbSearch(g.title).then(function(items){var m=bestMatch(items,g.title);if(m){applyInfo(g,m);return true}return false}):Promise.resolve(false);
+return p.then(function(ok){return hltbRemote(g.title).then(function(h){if(h){g.hltb=h;return true}return ok})})}
+function syncAll(){var gs=S.games.filter(function(g){return !g.cover||!g.summary||!(g.shots&&g.shots.length)}),n=0,i=0;toast(t('syncing',{m:gs.length}));
+(function next(){if(i>=gs.length){saveNow();toast(t('synced',{n:n}));refresh();return}var g=gs[i++];syncGame(g).then(function(ok){if(ok)n++}).then(function(){setTimeout(next,300)})})()}
+var HLTB='https://hltb-proxy.fly.dev/v1/query?title=';
+function pickNum(o,keys){for(var i=0;i<keys.length;i++){var v=o&&o[keys[i]];v=typeof v==='string'?parseFloat(v):v;if(typeof v==='number'&&isFinite(v)&&v>0)return v>=1000?v/3600:v}return 0}
+function hltbParse(j,title){var arr=Array.isArray(j)?j:(j&&(j.data||j.results||j.games))||(j&&typeof j==='object'?[j]:[]);if(!Array.isArray(arr))arr=[arr];var n=norm(title);
+var it=arr.find(function(x){return x&&norm(x.game_name||x.name||x.title||x.gameName)===n})||arr[0];if(!it)return null;
+var r2=function(v){return v?Math.round(v*2)/2:0};
+var main=pickNum(it,['gameplayMain','comp_main','mainStory','main_story','main','mainTime']),extra=pickNum(it,['gameplayMainExtra','comp_plus','mainExtra','main_extra','mainPlusExtras','extra']),comp=pickNum(it,['gameplayCompletionist','comp_100','completionist','completion','all']);
+if(!main&&!extra&&!comp)return null;main=main||extra||comp;return {main:r2(main),extra:r2(extra||main),comp:r2(comp||extra||main)}}
+function hltbSync(g,onlyEmpty){if(onlyEmpty&&g.hltb&&g.hltb.main)return;hltbRemote(g.title).then(function(h){if(h){g.hltb=h;save();refresh()}})}
+function hltbRemote(title){return fetch(HLTB+encodeURIComponent(title)).then(function(r){return r.ok?r.json():null}).then(function(j){return j?hltbParse(j,title):null}).catch(function(){return null})}
+var liveT;
+
+/* ---------- REVIEW ---------- */
+function viewReview(){var seg=['reviews','stats','gallery','medals'];
+return '<div class="top gx"><h1>'+t('review')+'</h1><button class="iconbtn" data-a="rv-new" aria-label="'+t('writeReview')+'">'+ic('plus')+'</button></div><div class="scroll"><div class="gx page"><div class="seg">'+seg.map(function(k){return '<button class="'+(ui.rvTab===k?'on':'')+'" data-a="rv-tab" data-v="'+k+'">'+t(k)+'</button>'}).join('')+'</div>'+({reviews:rvReviews,stats:rvStats,gallery:rvGallery,medals:rvMedals}[ui.rvTab])()+'</div></div>'}
+function rvReviews(){var rs=S.games.filter(function(g){return g.review}).sort(function(a,b){return b.review.date-a.review.date});
+if(!rs.length)return empty(t('noReviews'),t('noReviewsHint'),'review')+'<button class="btn primary wide" data-a="rv-new">'+ic('plus',18)+t('writeReview')+'</button>';
+return '<div class="rlist">'+rs.map(function(g){var r=g.review,sc=avg(r);
+return '<button class="rcard" data-a="rv-edit" data-id="'+g.id+'"><div class="rtop"><div class="rcv">'+coverHTML(g)+'</div><div class="rinfo"><div class="gt">'+esc(g.title)+(g.full100?'<span class="medi">'+ic('medal',15)+'</span>':'')+'</div><div class="muted sm">'+fmtDate(r.date)+'</div></div><div class="ring" style="--p:'+sc*10+'"><span>'+sc.toFixed(1)+'</span></div></div><div class="bars">'+CATS4.map(function(k){return '<div class="b4"><span>'+t(k)+'</span><div class="track"><i style="width:'+r[k]*10+'%"></i></div><b class="mono">'+r[k]+'</b></div>'}).join('')+'</div>'+(r.text?'<p class="rtext">'+esc(r.text)+'</p>':'')+'</button>'}).join('')+'</div>'}
+function barList(items,color,fixed){var mx=fixed||Math.max.apply(null,items.map(function(i){return i[1]}).concat([1]));return '<div class="bl">'+items.map(function(i){return '<div class="it"><span>'+esc(i[0])+'</span><div class="track"><i style="width:'+i[1]/mx*100+'%;'+(color?'background:'+color:'')+'"></i></div><b>'+i[1]+'</b></div>'}).join('')+'</div>'}
+function rvStats(){var G=S.games;if(!G.length)return empty(t('noGames'),t('emptyLibHint'),'stack');
+var cnt=function(s){return G.filter(function(g){return g.status===s}).length},played=G.filter(function(g){return g.status!=='wishlist'}).length,rate=played?Math.round(cnt('completed')/played*100):0;
+var rv=G.filter(function(g){return g.review}),av=rv.length?rv.reduce(function(a,g){return a+avg(g.review)},0)/rv.length:null;
+var left=G.filter(function(g){return ['progress','backlog','paused'].indexOf(g.status)>=0}).reduce(function(a,g){return a+Math.max(0,((g.hltb&&g.hltb.main)||0)-(g.played||0))},0);
+var gc={},pc={};G.forEach(function(g){g.genres.forEach(function(x){gc[x]=(gc[x]||0)+1});if(g.platform)pc[g.platform]=(pc[g.platform]||0)+1});
+var top=function(o,n){return Object.keys(o).map(function(k){return [k,o[k]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,n)};
+var tot=G.length;
+return '<div class="tiles"><div class="tile"><b>'+tot+'</b><span>'+t('totalGames')+'</span></div><div class="tile"><b>'+rate+'%</b><span>'+t('completionRate')+'</span></div><div class="tile"><b>'+(av==null?'—':av.toFixed(1))+'</b><span>'+t('avgScore')+'</span></div><div class="tile"><b>'+fmtH(left)+'</b><span>'+t('toClear')+'</span></div></div>'+
+'<p class="muted sm" style="margin-top:-6px">'+t('weeksAt',{n:Math.ceil(left/10)})+'</p>'+
+'<div class="card"><h2>'+t('statusSplit')+'</h2><div class="stack">'+STATUSES.filter(function(s){return cnt(s)}).map(function(s){return '<i style="width:'+cnt(s)/tot*100+'%;background:var(--c-'+s+')"></i>'}).join('')+'</div><div class="legend">'+STATUSES.map(function(s){return '<div><i style="background:var(--c-'+s+')"></i><span>'+t('st_'+s)+'</span><b>'+cnt(s)+'</b></div>'}).join('')+'</div></div>'+
+'<div class="card"><h2>'+t('categoryScores')+'</h2>'+(rv.length?barList(CATS4.map(function(k){return [t(k),Math.round(rv.reduce(function(a,g){return a+g.review[k]},0)/rv.length*10)/10]}),'var(--c-completed)',10):'<p class="muted sm">'+t('noScores')+'</p>')+'</div>'+
+'<div class="card"><h2>'+t('topGenres')+'</h2>'+barList(top(gc,6))+'</div><div class="card"><h2>'+t('topPlatforms')+'</h2>'+barList(top(pc,5),'var(--c-progress)')+'</div>'}
+function shotThumbs(g){var th=function(arr,k){return (arr||[]).map(function(u,i){return '<button class="shot" data-a="shot-view" data-id="'+g.id+'" data-n="'+i+'" data-k="'+k+'"><img class="rimg" src="'+esc(u)+'" alt="'+esc(g.title)+'" loading="lazy"></button>'}).join('')};return th(g.shots,'shots')+th(g.gallery,'gallery')}
+function rvGallery(){var gs=S.games.filter(function(g){return (g.gallery&&g.gallery.length)||(g.shots&&g.shots.length)});var add='<button class="btn wide" data-a="shot-pick">'+ic('image',18)+t('addShot')+'</button>';
+if(!gs.length)return empty(t('noShots'),t('noShotsHint'),'image')+add;
+return add+gs.map(function(g){return '<div><h3 class="gh" style="margin-bottom:10px">'+esc(g.title)+'<span class="count">'+((g.gallery||[]).length+(g.shots||[]).length)+'</span></h3><div class="shots">'+shotThumbs(g)+'</div></div>'}).join('')}
+function medalSVG(g,sz){return '<svg viewBox="0 0 64 80" width="'+sz+'" height="'+sz*1.25+'" aria-hidden="true"><path d="M16 2h14l6 22-14 4z" fill="#3B9DFF"/><path d="M48 2H34l-6 22 14 4z" fill="#F0605D"/><circle cx="32" cy="52" r="24" fill="url(#gold)"/><circle cx="32" cy="52" r="18" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2"/><polygon points="32,43 34.6,49 41,49.6 36.2,53.8 37.7,60 32,56.7 26.3,60 27.8,53.8 23,49.6 29.4,49" fill="#fff" fill-opacity=".92"/></svg>'}
+function rvMedals(){var m=S.games.filter(function(g){return g.full100}),c=S.games.filter(function(g){return g.status==='completed'&&!g.full100});
+return '<div class="mhero">'+medalSVG(null,52)+'<div><h2>'+t('earned',{n:m.length})+'</h2><p class="muted sm">'+t('medalsHint')+'</p></div></div>'+
+(m.length?'<div class="mgrid">'+m.map(function(g){return '<div class="mcard">'+medalSVG(g,56)+'<div class="gt">'+esc(g.title)+'</div><div class="muted sm">'+(g.review?fmtDate(g.review.date):t('st_completed'))+'</div></div>'}).join('')+'</div>':empty(t('noMedals'),t('medalsHint'),'medal'))+
+(c.length?'<div><h3 class="gh" style="margin-bottom:10px">'+t('almost')+'</h3><div class="glist">'+c.map(function(g){return '<div class="grow"><div class="rcv">'+coverHTML(g)+'</div><div class="gi"><div class="gt">'+esc(g.title)+'</div></div><button class="btn sm primary" data-a="medal-mark" data-id="'+g.id+'">'+t('markFull')+'</button></div>'}).join('')+'</div></div>':'')}
+
+/* ---------- SETTINGS ---------- */
+function listEditor(kind,items,ph){return '<div class="chips">'+(items.length?items.map(function(x){return '<span class="chip on">'+esc(x)+'<button class="x" data-a="'+kind+'-del" data-v="'+esc(x)+'" aria-label="'+t('delete')+' '+esc(x)+'">'+ic('close',12)+'</button></span>'}).join(''):'<span class="muted sm">'+t('none')+'</span>')+'</div><form class="row" data-f="'+kind+'-add"><input class="fld" name="v" placeholder="'+ph+'" maxlength="28" aria-label="'+ph+'"><button class="btn sm primary" type="submit">'+t('add')+'</button></form>'}
+function viewSettings(){var p=S.profile,s=S.settings,shots=S.games.reduce(function(a,g){return a+(g.gallery?g.gallery.length:0)},0);
+return '<div class="top gx"><h1>'+t('nav_settings')+'</h1></div><div class="scroll"><div class="gx page">'+
+'<div class="card"><div class="prof">'+avatarHTML(p,62)+'<div style="flex:1;min-width:0"><div class="gt" style="font:700 19px var(--display)">'+esc(p.name)+'</div><div class="muted sm">'+esc(p.bio||'')+'</div></div></div><button class="btn wide" data-a="edit-profile">'+t('editProfile')+'</button></div>'+
+'<div class="card"><h2>'+t('appearance')+'</h2><div><div class="lab">'+t('mode')+'</div><div class="seg">'+['system','light','dark'].map(function(m){return '<button class="'+(s.mode===m?'on':'')+'" data-a="set-mode" data-v="'+m+'">'+t('mode_'+m)+'</button>'}).join('')+'</div></div>'+
+'<div><div class="lab">'+t('accent')+'</div><div class="swatches">'+Object.keys(ACC).map(function(k){return '<button class="swatch'+(s.accent===k?' on':'')+'" style="background:'+ACC[k][0]+';color:'+ACC[k][1]+'" data-a="set-accent" data-v="'+k+'" aria-label="'+k+'">'+(s.accent===k?ic('check',16):'')+'</button>'}).join('')+'</div></div>'+
+'<div><div class="lab">'+t('language')+'</div><div class="seg"><button class="'+(s.lang==='en'?'on':'')+'" data-a="set-lang" data-v="en">English</button><button class="'+(s.lang==='id'?'on':'')+'" data-a="set-lang" data-v="id">Bahasa Indonesia</button></div></div>'+
+'<div><div class="lab">'+t('playBasis')+'</div><div class="seg">'+BASIS.map(function(b){return '<button class="'+(s.basis===b?'on':'')+'" data-a="set-basis" data-v="'+b+'">'+t('basis_'+b)+'</button>'}).join('')+'</div></div>'+
+'<div class="row"><b>'+t('sfx')+'</b><button class="sw'+(s.sound?' on':'')+'" role="switch" aria-checked="'+s.sound+'" data-a="set-sound" aria-label="'+t('sfx')+'"></button></div></div>'+
+'<div class="card"><h2>'+t('customGenres')+'</h2>'+listEditor('cg',s.customGenres,t('addGenre'))+'</div>'+
+'<div class="card"><h2>'+t('customPlatforms')+'</h2>'+listEditor('cp',s.customPlatforms,t('addPlatform'))+'</div>'+
+'<div class="card"><h2>'+t('backup')+'</h2><p class="muted sm">'+t('backupHint')+'</p><div class="row"><span>'+t('incShots')+' ('+shots+')</span><button class="sw'+(ui.incShots!==false?' on':'')+'" role="switch" aria-checked="'+(ui.incShots!==false)+'" data-a="bk-shots" aria-label="'+t('incShots')+'"></button></div>'+
+'<div class="grid2"><button class="btn primary" data-a="bk-copy">'+ic('copy',18)+t('copyBackup')+'</button><button class="btn" data-a="bk-show">'+(ui.bkOpen?t('hideText'):t('showText'))+'</button></div>'+
+'<div id="bkBox"'+(ui.bkOpen?'':' hidden')+'><textarea id="bkText" class="fld mono" style="font-size:12px;min-height:130px" placeholder="'+t('pasteHere')+'" aria-label="'+t('pasteHere')+'"></textarea></div>'+
+'<div class="grid2"><button class="btn" data-a="bk-restore">'+t('restore')+'</button><button class="btn" data-a="bk-file">'+t('restoreFile')+'</button></div></div>'+
+'<div class="card"><h2>'+t('sources')+'</h2><p class="muted sm">'+t('sourcesHint')+'</p>'+
+[['igdbClientId','directId','text'],['igdbClientSecret','directSecret','password'],['proxyUrl','proxyLbl','url']].map(function(f){return '<div><label class="lab" for="s_'+f[0]+'">'+t(f[1])+'</label><input id="s_'+f[0]+'" class="fld" type="'+f[2]+'" data-i="set-'+f[0]+'" value="'+esc(s[f[0]])+'" autocomplete="off" spellcheck="false"></div>'}).join('')+
+'<button class="btn wide" data-a="igdb-test">'+t('testBtn')+'</button><pre id="testOut" class="mono sm" style="white-space:pre-wrap;word-break:break-word;margin:0;color:var(--muted)"></pre><button class="btn wide" data-a="sync-all">'+ic('image',18)+t('syncAll')+'</button></div>'+
+'<div class="card"><h2>'+t('aiCard')+'</h2>'+[['geminiKey','geminiKey','password'],['geminiModel','geminiModel','text']].map(function(f){return '<div><label class="lab" for="s_'+f[0]+'">'+t(f[1])+'</label><input id="s_'+f[0]+'" class="fld" type="'+f[2]+'" data-i="set-'+f[0]+'" value="'+esc(s[f[0]])+'" autocomplete="off" spellcheck="false"></div>'}).join('')+'</div>'+
+'<div class="card"><h2>'+t('help')+'</h2><div>'+[1,2,3,4,5,6].map(function(i){return '<details class="fq"><summary>'+t('fq'+i)+'</summary><p>'+t('fa'+i)+'</p></details>'}).join('')+
+'<details class="fq"><summary>'+t('about')+'</summary><p>'+t('aboutText')+'</p></details>'+
+'<details class="fq"><summary>'+t('contact')+'</summary><p>'+t('contactHint')+'</p><label class="lab" for="cMsg" style="margin-top:10px">'+t('yourMessage')+'</label><textarea id="cMsg" class="fld"></textarea><button class="btn sm primary" style="margin-top:10px" data-a="copy-msg">'+ic('copy',16)+t('copyMessage')+'</button></details></div></div>'+
+'<div class="card"><h2>'+t('dataZone')+'</h2>'+'<button class="btn danger wide" data-a="reset-all">'+ic('trash',18)+t('resetAll')+'</button></div></div></div>'}
+function makeBackup(){var o={app:'questlog',v:1,at:new Date().toISOString(),profile:S.profile,settings:Object.assign({},S.settings,{geminiKey:'',igdbClientSecret:''}),games:S.games.map(function(g){return ui.incShots===false?Object.assign({},g,{gallery:[]}):g})};return JSON.stringify(o)}
+function doRestore(txt){var o;try{o=JSON.parse(txt)}catch(e){toast(t('badBackup'));return}
+if(!o||o.app!=='questlog'||!Array.isArray(o.games)){toast(t('badBackup'));return}
+S.profile=o.profile||S.profile;S.settings=Object.assign(defaults().settings,S.settings,o.settings||{},{geminiKey:S.settings.geminiKey,igdbClientSecret:S.settings.igdbClientSecret});S.games=o.games;saveNow();applyTheme();buildNav();refresh();toast(t('restored'))}
+
+/* ---------- profile form (onboarding + edit) ---------- */
+function profileForm(isOnb){var p=ui.pf;
+return '<div class="avpick">'+avatarHTML(p,72)+'<div style="flex:1;min-width:0"><div class="glyphs">'+GLYPHS.map(function(g){return '<button class="glyph'+(!p.photo&&p.glyph===g?' on':'')+'" data-a="p-glyph" data-v="'+g+'" aria-label="'+g+'">'+ic(g,20)+'</button>'}).join('')+'</div></div></div>'+
+'<div class="row" style="justify-content:flex-start;gap:10px;flex-wrap:wrap">'+AVC.map(function(c){return '<button class="dc'+(p.color===c?' on':'')+'" style="background:'+c+'" data-a="p-color" data-v="'+c+'" aria-label="'+c+'"></button>'}).join('')+'<button class="btn sm" data-a="p-photo">'+ic('image',16)+t('uploadPhoto')+'</button>'+(p.photo?'<button class="btn sm" data-a="p-nophoto">'+t('removePhoto')+'</button>':'')+'</div>'+
+'<div><label class="lab" for="pfName">'+t('name')+'</label><input id="pfName" class="fld" data-i="pf-name" maxlength="24" value="'+esc(p.name)+'" autocomplete="nickname"></div>'+
+'<div><label class="lab" for="pfBio">'+t('bio')+'</label><input id="pfBio" class="fld" data-i="pf-bio" maxlength="60" value="'+esc(p.bio)+'"></div>'+
+'<div><div class="lab">'+t('favPlatform')+'</div><div class="chips">'+allPlats().map(function(x){return '<button class="chip'+(p.platform===x?' on':'')+'" data-a="p-plat" data-v="'+esc(x)+'">'+esc(x)+'</button>'}).join('')+'</div></div>'+
+(isOnb?'<div><div class="lab">'+t('language')+'</div><div class="seg"><button class="'+(S.settings.lang==='en'?'on':'')+'" data-a="p-lang" data-v="en">English</button><button class="'+(S.settings.lang==='id'?'on':'')+'" data-a="p-lang" data-v="id">Bahasa Indonesia</button></div></div>':'')}
+function showOnb(){ui.pf={name:'',bio:'',glyph:'controller',color:AVC[0],photo:null,platform:'',sample:true};var o=$('#onb');o.hidden=false;renderOnb()}
+function renderOnb(){var o=$('#onb');o.innerHTML='<div class="onb-in gx"><div><h1>'+t('onbTitle')+'</h1><p class="muted" style="margin-top:6px">'+t('onbSub')+'</p></div><div id="pform" style="display:flex;flex-direction:column;gap:16px">'+profileForm(true)+'</div><button class="btn primary wide" data-a="onb-go">'+ic('play',18)+t('start')+'</button></div>'}
+function rerenderPF(){var f=$('#pform');if(f)f.innerHTML=profileForm(!!$('#onb:not([hidden])'))}
+/* ---------- events ---------- */
+function act(a,el){switch(a){
+case 'tab':go(el.dataset.t);break;
+case 'cat':ui.status=ui.status===el.dataset.s?null:el.dataset.s;blip(700);updateHome();break;
+case 'basis':S.settings.basis=el.dataset.b;save();updateHome();break;
+case 'toggle-view':ui.view=ui.view==='grid'?'list':'grid';S.settings.view=ui.view;save();$('#vbtn').innerHTML=ic(ui.view==='grid'?'list':'grid');updateHome();break;
+case 'clear-f':ui.status=null;ui.plats=[];ui.genres=[];ui.q='';var q=$('#homeQ');if(q)q.value='';updateHome();break;
+case 'sheet-filter':openSheet(filterSheet());break;
+case 'f-sort':ui.sort=el.dataset.v;S.settings.sort=ui.sort;save();$$('[data-a="f-sort"]').forEach(function(b){b.classList.toggle('on',b===el)});updateHome();break;
+case 'f-status':ui.status=ui.status===el.dataset.s?null:el.dataset.s;$$('[data-a="f-status"]').forEach(function(b){b.classList.toggle('on',b.dataset.s===ui.status)});updateHome();break;
+case 'f-plat':case 'f-genre':var arr=a==='f-plat'?ui.plats:ui.genres,v=el.dataset.v,i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else arr.push(v);el.classList.toggle('on',i<0);updateHome();break;
+case 'f-reset':ui.status=null;ui.plats=[];ui.genres=[];ui.sort='added';S.settings.sort='added';openSheet(filterSheet());updateHome();break;
+case 'close-sheet':closeSheet();break;
+case 'sheet-add':ui.sh={draft:{id:uid(),title:'',year:'',dev:'',genres:[],platform:(S.profile&&S.profile.platform)||'',status:'backlog',hltb:{main:0,extra:0,comp:0},played:0,added:Date.now(),review:null,full100:false,gallery:[]}};openSheet(gameSheet(ui.sh.draft,true));break;
+case 'open-game':ui.sh={id:el.dataset.id};openSheet(detailSheet(curG()));break;
+case 'g-edit':openSheet(gameSheet(curG(),false));break;
+case 'g-back':openSheet(detailSheet(curG()));break;
+case 'd-status':var dg=curG();dg.status=el.dataset.s;if(dg.status!=='completed')dg.full100=false;$$('#dStatus .stile').forEach(function(b){var on=b.dataset.s===dg.status;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});blip(700);save();break;
+case 'd-plat':var dp=curG();dp.platform=el.dataset.v;$$('#dPlat .chip[data-v]').forEach(function(b){b.classList.toggle('on',b.dataset.v===dp.platform)});save();break;
+case 'd-plat-new':var pf=$('#dPlatForm');pf.hidden=!pf.hidden;if(!pf.hidden)pf.elements.v.focus();break;
+case 'g-cover':$('#fileCover').click();break;
+case 'g-cover-del':var cg=curG();cg.cover='';save();openSheet(gameSheet(cg,!!ui.sh.draft));break;
+case 'g-status':var g=curG();g.status=el.dataset.s;if(g.status!=='completed')g.full100=false;$$('#gStatus .chip').forEach(function(b){b.classList.toggle('on',b.dataset.s===g.status)});save();break;
+case 'g-genre':var g2=curG(),v2=el.dataset.v,i2=g2.genres.indexOf(v2);if(i2>=0)g2.genres.splice(i2,1);else g2.genres.push(v2);el.classList.toggle('on',i2<0);save();break;
+case 'g-add':var gd=ui.sh.draft;if(!gd.title.trim()){toast(t('title')+'?');return}gd.title=gd.title.trim();S.games.push(gd);saveNow();hltbSync(gd,true);blip(880);toast(t('addedTo',{s:t('st_'+gd.status)}));closeSheet();break;
+case 'g-del':twoTap(el,function(){var id=ui.sh.id;S.games=S.games.filter(function(x){return x.id!==id});saveNow();closeSheet()});break;
+case 'g-lookup':var gl=curG(),isN=!!ui.sh.draft;syncGame(gl).then(function(ok){if(!ok){toast(t('syncFail'));return}save();if(ui.sh&&curG()===gl)openSheet(gameSheet(gl,isN))});break;
+case 'g-review':var gr=curG();if(ui.sh.draft)return;reviewSheet(gr.id);break;
+case 'g-shot':ui.shotGame=ui.sh.id;$('#fileShot').click();break;
+case 'x-add':var item=ui.xmap[el.dataset.k];if(item)addSheet(item);break;
+case 'xa-status':ui.xa.status=el.dataset.s;openSheet(addSheetHTML());break;
+case 'xa-plat':ui.xa.platform=el.dataset.v;openSheet(addSheetHTML());break;
+case 'xa-go':var xa=ui.xa,ng=newGame(xa.item,xa.status,xa.platform);S.games.push(ng);saveNow();hltbSync(ng);blip(880);toast(t('addedTo',{s:t('st_'+xa.status)}));closeSheet();break;
+case 'more-live':loadList('live',liveFetch,true);break;
+case 'more-top':loadList('top',topFetch,true);break;
+case 'x-info':var xi=ui.xmap[el.dataset.k];if(xi)openSheet(infoSheet(xi));break;
+case 'xi-add':addSheet(ui.xi);break;
+case 'ai-close':ui.ai={state:'idle',items:[]};renderAI();break;
+case 'x-ai':askGemini();break;
+case 'rv-tab':ui.rvTab=el.dataset.v;refresh();break;
+case 'rv-new':pickSheet('review');break;
+case 'rv-edit':reviewSheet(el.dataset.id);break;
+case 'pick-go':if(ui.pick==='review')reviewSheet(el.dataset.id);else{ui.shotGame=el.dataset.id;closeSheet();$('#fileShot').click()}break;
+case 'rv-full':ui.rv.full=!ui.rv.full;el.classList.toggle('on',ui.rv.full);el.setAttribute('aria-checked',ui.rv.full);break;
+case 'rv-save':var rg=S.games.find(function(x){return x.id===ui.rv.id});rg.review={visual:ui.rv.visual,gameplay:ui.rv.gameplay,audio:ui.rv.audio,design:ui.rv.design,text:ui.rv.text.trim(),date:Date.now()};rg.full100=ui.rv.full;if(rg.full100)rg.status='completed';saveNow();blip(920);toast(t('saved'));closeSheet();break;
+case 'rv-del':twoTap(el,function(){var dg=S.games.find(function(x){return x.id===ui.rv.id});dg.review=null;saveNow();closeSheet()});break;
+case 'shot-pick':pickSheet('shot');break;
+case 'shot-view':openLightbox(el.dataset.id,+el.dataset.n,el.dataset.k);break;
+case 'lb-close':$('#lightbox').hidden=true;break;
+case 'lb-del':var lg=S.games.find(function(x){return x.id===el.dataset.id});lg.gallery.splice(+el.dataset.n,1);saveNow();$('#lightbox').hidden=true;refresh();break;
+case 'medal-mark':var mg=S.games.find(function(x){return x.id===el.dataset.id});mg.full100=true;mg.status='completed';save();blip(920);refresh();break;
+case 'edit-profile':ui.pf=Object.assign({},S.profile,{sample:false});openSheet('<div class="grab"></div><div class="gx sh"><div class="sh-title"><h2>'+t('editProfile')+'</h2><button class="iconbtn sm" data-a="close-sheet" aria-label="'+t('close')+'">'+ic('close',18)+'</button></div><div id="pform" style="display:flex;flex-direction:column;gap:16px">'+profileForm(false)+'</div><button class="btn primary wide" data-a="p-save">'+ic('check',18)+t('save')+'</button></div>');break;
+case 'p-glyph':ui.pf.glyph=el.dataset.v;ui.pf.photo=null;rerenderPF();break;
+case 'p-color':ui.pf.color=el.dataset.v;rerenderPF();break;
+case 'p-plat':ui.pf.platform=ui.pf.platform===el.dataset.v?'':el.dataset.v;rerenderPF();break;
+case 'p-photo':$('#filePhoto').click();break;
+case 'p-nophoto':ui.pf.photo=null;rerenderPF();break;
+case 'p-lang':S.settings.lang=el.dataset.v;applyTheme();buildNav();renderOnb();break;
+case 'p-save':if(!ui.pf.name.trim()){toast(t('nameReq'));return}S.profile={name:ui.pf.name.trim(),bio:ui.pf.bio.trim(),glyph:ui.pf.glyph,color:ui.pf.color,photo:ui.pf.photo,platform:ui.pf.platform};saveNow();toast(t('saved'));closeSheet();break;
+case 'onb-go':if(!ui.pf.name.trim()){toast(t('nameReq'));var nf=$('#pfName');if(nf)nf.focus();return}S.profile={name:ui.pf.name.trim(),bio:ui.pf.bio.trim(),glyph:ui.pf.glyph,color:ui.pf.color,photo:ui.pf.photo,platform:ui.pf.platform};saveNow();$('#onb').hidden=true;blip(880);showApp();break;
+case 'set-mode':S.settings.mode=el.dataset.v;applyTheme();save();refresh();break;
+case 'set-accent':S.settings.accent=el.dataset.v;applyTheme();save();refresh();break;
+case 'set-lang':S.settings.lang=el.dataset.v;applyTheme();save();buildNav();refresh();break;
+case 'set-basis':S.settings.basis=el.dataset.v;save();refresh();break;
+case 'set-sound':S.settings.sound=!S.settings.sound;save();if(S.settings.sound){actx()&&AC.resume();blip(700)}refresh();break;
+case 'cg-del':S.settings.customGenres=S.settings.customGenres.filter(function(x){return x!==el.dataset.v});save();refresh();break;
+case 'cp-del':S.settings.customPlatforms=S.settings.customPlatforms.filter(function(x){return x!==el.dataset.v});save();refresh();break;
+case 'bk-shots':ui.incShots=ui.incShots===false;refresh();break;
+case 'bk-show':ui.bkOpen=!ui.bkOpen;var bt=$('#bkText');if(ui.bkOpen){refresh();$('#bkText').value=makeBackup()}else refresh();break;
+case 'bk-copy':var js=makeBackup();(navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(js):Promise.reject()).then(function(){toast(t('copied'))}).catch(function(){ui.bkOpen=true;refresh();var b=$('#bkText');b.value=js;b.focus();b.select();toast(t('copyFail'))});break;
+case 'bk-restore':var bx=$('#bkText');if(!ui.bkOpen){ui.bkOpen=true;refresh();$('#bkText').focus();return}if(!bx.value.trim()){bx.focus();return}if(!el.dataset.armed){el.dataset.armed='1';el._h=el.innerHTML;el.textContent=t('confirmDelete');el._t=setTimeout(function(){delete el.dataset.armed;el.innerHTML=el._h},3000);return}doRestore(bx.value);break;
+case 'bk-file':$('#fileRestore').click();break;
+case 'copy-msg':var m=$('#cMsg').value;if(!m.trim())return;(navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(m):Promise.reject()).then(function(){toast(t('copied'))}).catch(function(){$('#cMsg').select();toast(t('copyFail'))});break;
+case 'sync-all':syncAll();break;
+case 'igdb-test':igdbTest();break;
+case 'reset-all':twoTap(el,function(){S=defaults();saveNow();applyTheme();$('#view').innerHTML='';showOnb()});break}}
+function inp(k,el){
+if(k==='homeQ'){ui.q=el.value;updateHome()}
+else if(k==='exQ'){ui.exQ=el.value;var q=el.value.trim();clearTimeout(liveT);
+if(igdbOn()&&q.length>=3){ui.live=Object.assign(newList(),{q:q,state:'loading'});liveT=setTimeout(function(){if(ui.exQ.trim()===q)loadList('live',liveFetch,false)},450)}
+updateExplore()}
+else if(k==='g-title'){var g=curG();if(!g)return;g.title=el.value;if(!ui.sh.draft)save()}
+else if(k==='g-dev'){var gd2=curG();if(gd2){gd2.dev=el.value;if(!ui.sh.draft)save()}}
+else if(k==='g-sum'){var gs2=curG();if(gs2){gs2.summary=el.value;if(!ui.sh.draft)save()}}
+else if(k.indexOf('rv-')===0){var f2=k.slice(3);if(CATS4.indexOf(f2)>=0){ui.rv[f2]=parseFloat(el.value);$('#v_'+f2).textContent=ui.rv[f2];el.style.setProperty('--fill',ui.rv[f2]*10+'%');var sc=avg(ui.rv);$('#rvScore').textContent=sc.toFixed(1);$('#rvRing').style.setProperty('--p',sc*10)}else ui.rv.text=el.value}
+else if(k==='pf-name')ui.pf.name=el.value;else if(k==='pf-bio')ui.pf.bio=el.value;
+else if(k.indexOf('set-')===0){S.settings[k.slice(4)]=el.value.trim();if(k.indexOf('set-igdb')===0||k==='set-proxyUrl'){ui.top=newList();ui.live=newList();directTok=null}save();if(ui.tab==='explore')updateExplore()}}
+function chg(k,el){var g=curG();
+if(k==='g-plat'){g.platform=el.value;save()}
+else if(k==='g-year'){g.year=el.value?parseInt(el.value,10):'';save()}
+else if(k==='g-num'){var v=parseFloat(el.value);v=isNaN(v)?0:Math.max(0,v);if(el.dataset.f==='played')g.played=v;else{g.hltb=g.hltb||{};g.hltb[el.dataset.f]=v}save()}}
+function openLightbox(id,n,k){var g=k==='xi'?ui.xi:(S.games.find(function(x){return x.id===id})||(ui.sh&&ui.sh.draft&&ui.sh.draft.id===id?ui.sh.draft:null));if(!g)return;var arr=(k==='shots'||k==='xi')?g.shots:g.gallery;if(!arr||!arr[n])return;var lb=$('#lightbox');lb.hidden=false;lb.innerHTML='<img src="'+esc(arr[n])+'" alt="'+esc(g.title)+'"><div class="gt">'+esc(g.title)+'</div><div class="row" style="gap:10px"><button class="btn" data-a="lb-close">'+t('close')+'</button>'+((k==='shots'||k==='xi')?'':'<button class="btn danger" data-a="lb-del" data-id="'+id+'" data-n="'+n+'">'+ic('trash',18)+t('delete')+'</button>')+'</div>'}
+document.addEventListener('error',function(e){var el=e.target;if(el&&el.classList&&(el.classList.contains('cimg')||el.classList.contains('rimg')))el.remove()},true);
+document.addEventListener('click',function(e){var el=e.target.closest('[data-a]');if(el)act(el.dataset.a,el)});
+document.addEventListener('input',function(e){var el=e.target.closest('[data-i]');if(el)inp(el.dataset.i,el)});
+document.addEventListener('change',function(e){var el=e.target.closest('[data-c]');if(el)chg(el.dataset.c,el)});
+document.addEventListener('submit',function(e){var f=e.target.closest('[data-f]');if(!f)return;e.preventDefault();var v=f.elements.v.value.trim();if(!v)return;if(f.dataset.f==='g-plat-add'){var pg=curG();if(!pg)return;if(allPlats().indexOf(v)<0)S.settings.customPlatforms.push(v);pg.platform=v;save();openSheet(detailSheet(pg));return}var k=f.dataset.f==='cg-add'?'customGenres':'customPlatforms';if(S.settings[k].indexOf(v)<0)S.settings[k].push(v);save();refresh()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(!$('#lightbox').hidden)$('#lightbox').hidden=true;else closeSheet()}});
+$('#sheet').addEventListener('click',function(e){if(e.target.id==='sheet')closeSheet()});
+$('#lightbox').addEventListener('click',function(e){if(e.target.id==='lightbox')e.target.hidden=true});
+$('#view').addEventListener('animationend',function(e){if(e.target.id==='view'&&e.animationName!=='vout')e.target.className='view'});
+$('#fileCover').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;var g=curG();if(!g)return;readImg(f,480,.82).then(function(u){g.cover=u;save();openSheet(gameSheet(g,!!ui.sh.draft));toast(t('saved'))}).catch(function(){toast(t('storageFull'))})});
+$('#fileShot').addEventListener('change',function(e){var fs=Array.prototype.slice.call(e.target.files||[]),g=S.games.find(function(x){return x.id===ui.shotGame});e.target.value='';if(!g||!fs.length)return;
+Promise.all(fs.map(function(f){return readImg(f,720,.68)})).then(function(urls){g.gallery=(g.gallery||[]).concat(urls);saveNow();toast(t('saved'));if(ui.sh&&ui.sh.id===g.id)openSheet(gameSheet(g,false));else refresh()}).catch(function(){toast(t('storageFull'))})});
+$('#filePhoto').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;readImg(f,256,.8).then(function(u){ui.pf.photo=u;rerenderPF()})});
+$('#fileRestore').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;var fr=new FileReader();fr.onload=function(){doRestore(String(fr.result))};fr.readAsText(f)});
+
+/* ---------- boot ---------- */
+function showApp(){$('#onb').hidden=true;ui.tab='home';buildNav();renderView();$('#view').className='view inr'}
+function startSplash(){
+ var word='Questlog';$('#wm').innerHTML=word.split('').map(function(c,i){return '<span style="--i:'+i+'">'+c+'</span>'}).join('');$('#tg').textContent=t('tagline');
+ var tb=$('#tapSound');tb.innerHTML=ic('sound',16)+t('tapSound');
+ var c=actx();var played=false;
+ function tryPlay(full){if(played)return;if(splashSound(full)){played=true;tb.hidden=true}}
+ if(c&&S.settings.sound){c.resume().then(function(){tryPlay(true)}).catch(function(){});
+  setTimeout(function(){tryPlay(true);if(!played&&c.state!=='running')tb.hidden=false},250)}
+ $('#splash').addEventListener('pointerdown',function(){var c2=actx();if(!c2||!S.settings.sound||played)return;c2.resume().then(function(){tryPlay(false)})},{once:true});
+}
+function boot(){
+ applyTheme();
+ startSplash();
+ setTimeout(function(){var s=$('#splash');s.classList.add('hide');setTimeout(function(){s.remove()},650);if(!S.profile)showOnb();else showApp()},3400);
+}
+boot();
+})();
+</script>
+</body></html>
